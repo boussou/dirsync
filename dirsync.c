@@ -1155,19 +1155,22 @@ static int dirsync(char *source,char *dest)
 			needCopy = 1;
 		else switch (mode)
 		{
-			case	0:
+			case	0:  // - Copy file if have different size or date (default)
 					if (se->statb.st_size != de->statb.st_size ||
 /*					  se->statb.st_mtime != de->statb.st_mtime)  */
 /* (JR) mod */
+                      //for a link=check whether mtime is above / otherwise=check whether mtime is just different
 					  isLink ? (se->statb.st_mtime > de->statb.st_mtime)
-						 : (se->statb.st_mtime != de->statb.st_mtime))
+						     : (se->statb.st_mtime != de->statb.st_mtime))
 						needCopy = 1;
 					break;
-			case	1:
+
+			case	1: // - Copy file if the destination is older than source
 					if (se->statb.st_mtime > de->statb.st_mtime)
 						needCopy = 1;
 					break;
-			case	2:
+
+			case	2:  // - Do not copy any file only show the difference
 /*					if (se->statb.st_size != de->statb.st_size)  */
 /* (JR) mod */
 					if (se->statb.st_size != de->statb.st_size ||
@@ -1176,12 +1179,11 @@ static int dirsync(char *source,char *dest)
 						needCopy = 1;
 					break;
 /* (JR) add */
-			case	3:
+			case	3: // - Like mode 0 but do not check size/time in symbolics link
 					if (se->statb.st_size != de->statb.st_size ||
 					  (!isLink && se->statb.st_mtime != de->statb.st_mtime))
 						needCopy = 1;
-					break;
-					
+					break;					
 		}
 							
 		if (needCopy)
@@ -1298,10 +1300,12 @@ static void Usage()
 	printf("\t-m mode\tSet copy file mode,always missing file are copied\n");
 	printf("\t\t0 - Copy file if have different size or date (default)\n");
 	printf("\t\t1 - Copy file if the destination is older than source\n");
-	printf("\t\t2 - Do not copy any file only show the difference \n");
-	printf("\t\t    with this code :  0 Directory not present in source\n");
-	printf("\t\t                   :  1 Directory nont present in destination\n");
-	printf("\t\t                      2 Different size, 4 Not equal\n");
+	printf("\t\t2 - Do not copy any file / only show the difference\n");
+	printf("\t\t    Then prefix codes :  0 Directory not present in source\n");
+	printf("\t\t                         1 Directory not present in destination\n");
+	printf("\t\t                         2 Different size\n");
+	printf("\t\t                         4 file content differs\n");	
+	printf("\t\t                         5 file to be removed (not present in source)\n");
 	printf("\t\t3 - Like mode 0 but do not check size/time in symbolics link\n");
 /* (JR) add */
 	printf("\t\t3 - Like mode 0, but don't check date on symlinks\n");
@@ -1394,7 +1398,7 @@ int main(int argc,char **argv)
 	long kbSec;
 	int o;
 	char logfile[PATH_MAX];
-	char * version = "DirSync 1.11 author mario@viara.cn, mod by (JR)";
+	char * version = "DirSync 1.12 author mario@viara.cn, mod by (JR)";
 
 	printf("%s\n\n",version);
 	
