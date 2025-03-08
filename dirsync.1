@@ -1,4 +1,4 @@
-.TH UD 1 "22 Nov 2005" "Dirsync 1.08 Release"
+.TH UD 1 "25 Nov 2005" "Dirsync 1.09 Release"
 .UC 6
 .SH NAME
 dirsync \- Directory Synchronizer
@@ -13,7 +13,13 @@ dirsync \- Directory Synchronizer
 .I size
 .B ] [-m
 .I mode
-.B ] [-V]
+.B ] [-V] [-T
+.I format
+.B ] [-D
+.I format
+.B ] [-l
+.I file
+.B ]
 .B source dest
 .SH DESCRIPTION
 DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical.
@@ -49,9 +55,22 @@ Set file mode copy.
 0 - Copy if have different size or date. (Default)
 .IP
 1 - Copy if the destination is oldest than source.
+.IP
+2 - Show only the difference.
 .TP
 .B \-r \
 Don't remove files/directories missed in the source.
+.TP
+.B \-T \ format
+Set the date and time format (in strftime style).
+.TP
+.B \-D \ format
+Set the date format (in strftime style).
+.TP
+.B \-l \ file
+Log the operation in the specified file. If file is - the filename will be 
+the current date formatted (see -D). Any line of the log have the date
+and time in the current time and date format (see -T).
 .TP
 (1) If name start with @ the remaining characters will be used as a file name. The file must contain space separated word used in sequence for the option.
 .SH "REPORTING BUGS"

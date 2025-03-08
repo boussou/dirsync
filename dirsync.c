@@ -1,10 +1,17 @@
 /**
- * $Id: dirsync.c,v 1.23 2005/11/05 20:54:16 mviara Exp $
+ * $Id: dirsync.c,v 1.28 2006/01/26 17:47:41 mviara Exp $
  * $Name:  $
  * 
  * Directories syncronizer. Derived from dirimage.
  *
- * $Log: dirsync.c,v $
+ *
+ * Revision 1.25  2005/11/26 14:59:12  mviara
+ *
+ * Tested in linux.
+ *
+ * Revision 1.24  2005/11/26 14:39:49  mviara
+ * Added support for mode 2 and log.
+ *
  * Revision 1.23  2005/11/05 20:54:16  mviara
  * Release 1.08
  *
@@ -84,7 +91,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.23 2005/11/05 20:54:16 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.28 2006/01/26 17:47:41 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -202,7 +209,7 @@ static int	fileVerify = 0;
 static Link_T	excludedDirs;
 static Link_T	excludedFiles;
 static Link_T	excludedRegex;
-
+static FILE *	log = 0;
 static char	* buffer,* buffer1;
 static int	bufferSize = DEFAULT_BUFFER_SIZE;
 static int	verbose = DEFAULT_VERBOSE;
@@ -223,14 +230,58 @@ static void QueueAdd(Link_T * head,Link_T * link)
 	head->next = link;
 }
 
+static char dateTimeFormat[128] = "%d/%m/%Y %H:%M:%S";
+
+static char * GetDateAndTime()
+{
+	time_t t;
+	static char  buffer[32];
+	struct tm * tmp;
+	
+	time(&t);
+	tmp =localtime(&t);
+	
+	strftime(buffer,sizeof(buffer),dateTimeFormat,tmp);
+
+	return buffer;
+}
+
+static char dateFormat[128] = "%d-%m-%Y";
+
+static char * GetDate()
+{
+	time_t t;
+	static char  buffer[32];
+	struct tm * tmp;
+
+	time(&t);
+	tmp =localtime(&t);
+
+	strftime(buffer,sizeof(buffer),dateFormat,tmp);
+
+	return buffer;
+}
+
+
+static void LogDateAndTime()
+{
+	fprintf(log,"%s ",GetDateAndTime());
+}
 
 static void PrintError(char *cmd,char *obj)
 {
 	int code = errno;
 	char *msg = strerror(code);
-	
+	if (code == 0)
+		msg = "";
 	fprintf(stderr,"\ndirsync: %s (%s) %s (%d)\n",cmd,obj,msg,code);
 	errors++;
+
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"%s (%s) %s (%d)\n",cmd,obj,msg,code);
+	}
 }
 
 static char * FilePath(char * dest,char * dir,char * file)
@@ -281,6 +332,108 @@ static void FileUnlink(char * path)
 
 }
 
+static int FileVerify(char * msg,char *source,char * dest,Entry_T *e)
+{
+	int fds,fdd;
+	int nread;
+	int result;
+	size_t count = 0;
+	char sourcePath[PATH_MAX+1];
+	char destPath[PATH_MAX+1];
+	size_t perc,oldPerc=101;
+
+	FilePath(sourcePath,source,e->name);
+	FilePath(destPath,dest,e->name);
+
+
+	fds = open(sourcePath,O_RDONLY|O_BINARY);
+
+	if (fds < 0)
+	{
+		PrintError("open",sourcePath);
+		return 1;
+	}
+
+	fdd = open(destPath,O_RDONLY|O_BINARY);
+
+
+	if (fdd < 0)
+	{
+		PrintError("open",destPath);
+		close(fds);
+		return 1;
+	}
+
+
+	if (verbose > 1)
+	{
+		MSG_PATH(msg);
+		printf("\rVERIFY %-50.50s %10ld Byte ",e->name,e->statb.st_size);
+		fflush(stdout);
+	}
+
+
+	result = 0;
+	
+	for (;;)
+	{
+		nread = read(fds,buffer,bufferSize);
+		
+		if (nread < 0)
+		{
+			PrintError("read",sourcePath);
+			result = 1;
+			break;
+		}
+
+		if (nread == 0)
+			break;
+
+		if (read(fdd,buffer1,nread) != nread)
+		{
+			PrintError("read",destPath);
+			result = 1;
+			break;
+		}
+
+		if (memcmp(buffer,buffer1,nread))
+		{
+			errno = 0;
+			PrintError("Verify",destPath);
+			result = 1;
+		}
+
+		count += nread;
+
+		if (verbose > 1)
+		{
+			if (count == e->statb.st_size)
+				perc = 100;
+			else
+				perc = (size_t)(((double)count * 100.0) / (double)e->statb.st_size);
+
+			if (perc > 100)
+				perc = 100;
+
+			if (perc != oldPerc)
+			{
+				printf("%%%03lu\010\010\010\010",perc);
+				fflush(stdout);
+				oldPerc = perc;
+			}
+		}
+	}
+
+	close(fdd);
+	close(fds);
+
+	printf("\r                                                                              \r");
+	
+	return result;
+
+}
+
+
 static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 {
 	int fds,fdd;
@@ -290,11 +443,17 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 	size_t count = 0;
 	size_t perc,oldPerc=101;
 	
+
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"COPY   %s %10lu Bytes\n",e->name,e->statb.st_size);
+	}
 	
 	if (verbose > 1)
 	{
 		MSG_PATH(msg);
-		printf("COPY   %-50.50s %10ld Byte ",e->name,e->statb.st_size);
+		printf("COPY   %-50.50s %10lu Byte ",e->name,e->statb.st_size);
 		fflush(stdout);
 	}
 	
@@ -370,91 +529,20 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 		PrintError("close",destPath);
 	}
 
-	while (fileVerify)
-	{
-		lseek(fds,0,SEEK_SET);
-		
-
-		fdd = open(destPath,O_RDONLY|O_BINARY,0777);
-		if (fdd < 0)
-		{
-			PrintError("open",destPath);
-			break;
-		}
-
-		count = 0;
-		oldPerc = 101;
-		
-		if (verbose > 1)
-		{
-			printf("\rVERIFY %-50.50s %10ld Byte ",e->name,e->statb.st_size);
-			fflush(stdout);
-		}
-
-		for (;;)
-		{
-			nread = read(fds,buffer,bufferSize);
-			if (nread < 0)
-			{
-				PrintError("read",sourcePath);
-				break;
-			}
-
-			if (nread == 0)
-				break;
-
-			if (read(fdd,buffer1,nread) != nread)
-			{
-				PrintError("read",destPath);
-				break;
-
-
-			}
-
-			if (memcmp(buffer,buffer1,nread))
-			{
-				PrintError("Verify",destPath);
-				break;
-			}
-			
-			count += nread;
-
-			if (verbose > 1)
-			{
-				if (count == e->statb.st_size)
-					perc = 100;
-				else
-					perc = (size_t)(((double)count * 100.0) / (double)e->statb.st_size);
-
-				if (perc > 100)
-					perc = 100;
-
-				if (perc != oldPerc)
-				{
-					printf("%%%03lu\010\010\010\010",perc);
-					fflush(stdout);
-					oldPerc = perc;
-				}
-			}
-		}
-
-		if (fdd >= 0)
-			close(fdd);
-
-		break;
-		
-	}
-	
 	if (close(fds))
 	{
 		PrintError("close",sourcePath);
 	}
 
+	if (fileVerify)
+		FileVerify(msg,source,dest,e);
+	
+
 
 	CopyAttribute(destPath,&e->statb);
 	
 	if (verbose > 1)
-		printf("\n");
+		printf("\r");
 
 	filesCopied++;
 
@@ -467,6 +555,7 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 	count /= 1024;
 	kbCopied += count;
 
+	
 }
 
 
@@ -476,6 +565,13 @@ static void FileRemove(char * msg,char *dir,char *file)
 	filesDeleted ++;
 	
 	FilePath(path,dir,file);
+
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"RM     %s\n",path);
+	}
+	
 	if (verbose > 0)
 	{
 		MSG_PATH(msg);
@@ -490,6 +586,7 @@ static void * CheckedAlloc(int size)
 {
 	void *p;
 
+	
 	if (!size)
 		return 0;
 	
@@ -647,6 +744,7 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 	if (verbose > 0)
 	{
 		printf("SCAN   %-60.60s  ",dirname);
+		
 		fflush(stdout);
 	}
 	
@@ -768,6 +866,13 @@ static void Rmdir(char * msg,char *dirname,char *file)
 
 	FilePath(path,dirname,file);
 
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"RMDIR  %s\n",path);
+		
+	}
+	
 	if (verbose > 0)
 	{
 		MSG_PATH(msg);
@@ -854,14 +959,23 @@ static int dirsync(char *source,char *dest)
 	long i;
 	
 	sprintf(msg,"FROM   %-70.70s\nTO     %-70.70s\n",source,dest);
+
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"FROM   %s\n",source);
+		LogDateAndTime();
+		fprintf(log,"TO     %s\n",dest);
+	}
 	
 	if (ScanDir(source,&dirSource,&statSource))
 		return 1;
 
-	// FIXME dealloc dirSource
 	if (ScanDir(dest,&dirDest,&statDest))
+	{
+		FreeDirectory(&dirSource);
 		return 1;
-
+	}
 	
 	// Step 1. Delete all file not present in the source dir
 	for (i = 0 ; i < dirDest.files.count ; i++)
@@ -873,12 +987,20 @@ static int dirsync(char *source,char *dest)
 		{
 			if (!dontRemove)
 			{
-				if (firstTime)
+				if (mode == 2)
 				{
-					firstTime = 0;
-					chmod(dest,0777);
-				}				
-				FileRemove(msg,dest,de->name);
+					MSG_PATH(msg);
+					printf("\t %s  - File not present in source\n",de->name);
+				}
+				else
+				{
+					if (firstTime)
+					{
+						firstTime = 0;
+						chmod(dest,0777);
+					}
+					FileRemove(msg,dest,de->name);
+				}
 			}
 		}
 	}
@@ -893,13 +1015,21 @@ static int dirsync(char *source,char *dest)
 		{
 			if (!dontRemove)
 			{
-				if (firstTime)
+				if (mode == 2)
 				{
-					firstTime = 0;
-					chmod(dest,0777);
-				}					
-
-				RmdirAll(msg,dest,de->name);
+					MSG_PATH(msg);
+					printf("\t0%s\n",de->name);
+					
+				}
+				else
+				{
+					if (firstTime)
+					{
+						firstTime = 0;
+						chmod(dest,0777);
+					}					
+					RmdirAll(msg,dest,de->name);
+				}
 			}
 		}
 	}
@@ -927,22 +1057,39 @@ static int dirsync(char *source,char *dest)
 					if (se->statb.st_mtime > de->statb.st_mtime)
 						needCopy = 1;
 					break;
+			case	2:
+					if (se->statb.st_size != de->statb.st_size)
+						needCopy = 1;
+					break;
+					
 		}
 							
-/*
-		printf("size %ld,%ld mtime %ld,%ld\n",se->statb.st_size,
-											  de->statb.st_size,
-										      se->statb.st_mtime,
-										      de->statb.st_mtime);*/
 		if (needCopy)
 		{
-			if (firstTime)
+			if (mode == 2)
 			{
-				firstTime = 0;
-				chmod(dest,0777);
-			}				
-
-			FileCopy(msg,source,dest,se);
+				MSG_PATH(msg);
+				printf("\t2 %s\n",se->name);
+			}
+			else
+			{
+				FileCopy(msg,source,dest,se);
+				if (firstTime)
+				{
+					firstTime = 0;
+					chmod(dest,0777);
+				}				
+				
+			}
+		}
+		else
+		{
+			if (mode == 2)
+				if (FileVerify(msg,source,dest,se))
+				{
+					MSG_PATH(msg);
+					printf("\t4 %s\n",se->name);
+				}
 		}
 			
 	}
@@ -958,15 +1105,21 @@ static int dirsync(char *source,char *dest)
 
 		if (de == NULL)
 		{
-			Mkdir(msg,destPath);
+			if (mode == 2)
+			{
+				MSG_PATH(msg);
+				printf("\t1 %s\n",se->name);
+			}
+			else
+				Mkdir(msg,destPath);
 		}
 
-
-		dirsync(sourcePath,destPath);
+		if (de != NULL || mode != 2)
+			dirsync(sourcePath,destPath);
 	}
 
 	/* Set destination directory attributes */
-	if (firstTime == 0)
+	if (firstTime == 0 && mode != 2)
 		CopyAttribute(dest,&statSource);
 
 	FreeDirectory(&dirDest);
@@ -992,6 +1145,13 @@ static void Usage()
 	printf("\t-m mode\tSet copy file mode,always missing file are copied\n");
 	printf("\t\t0 - Copy file if have different size or date (default)\n");
 	printf("\t\t1 - Copy file if the destination is oldest than source\n");
+	printf("\t\t2 - Do not copy any file only show the difference \n");
+	printf("\t\t    with this code :  0 Directory not present in source\n");
+	printf("\t\t                   :  1 Directory nont present in destination\n");
+	printf("\t\t                      2 Different size, 4 Not equal\n");
+	printf("\t-T fmt\tSet date and time format, default %s\n",dateTimeFormat);
+	printf("\t-D fmt\tSet date format, default %s\n",dateFormat);
+	printf("\t-l file\tLog operation in file, if - use date format .log (see -D)\n");
 	printf("\t-r\tDon't remove file/directory missed in the source\n");
 	printf("\n\t\t(1) If name begin with @ for example @list the names will be\n");
 	printf("\t\tread from a text file named list.\n");
@@ -1073,8 +1233,10 @@ int main(int argc,char **argv)
 	time_t start,end;
 	long kbSec;
 	int o;
+	char logfile[PATH_MAX];
+	char * version = "DirSync 1.09 author mario@viara.cn";
 
-	printf("DirSync 1.08 author mario@viara.cn\n\n");
+	printf("%s\n\n",version);
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
@@ -1086,10 +1248,36 @@ int main(int argc,char **argv)
 
 
 
-	while (( o = getopt(argc,argv,"Vqhv:x:X:b:m:re:")) != -1)
+	while (( o = getopt(argc,argv,"T:D:l:Vqhv:x:X:b:m:re:")) != -1)
 	{
 		switch (o)
 		{
+			case	'T':
+					strcpy(dateTimeFormat,optarg);
+					break;
+			case	'D':
+					strcpy(dateFormat,optarg);
+					break;
+			case	'l':
+					if (strcmp(optarg,"-"))
+						strcpy(logfile,optarg);
+					else
+						sprintf(logfile,"%s.log",GetDate());
+					log = fopen(logfile,"w");
+					if (log == NULL)
+					{
+						PrintError("fopen",logfile);
+						exit(1);
+					}
+					else
+					{
+						LogDateAndTime();
+						fprintf(log,"%s\n",version);
+					}
+					
+					if (verbose)
+						printf("Log operation in %s\n",logfile);
+					break;
 			case	'V':
 					fileVerify = 1;
 					break;
@@ -1099,7 +1287,7 @@ int main(int argc,char **argv)
 					
 			case	'm':
 					mode = atoi(optarg);
-					if (mode < 0 || mode > 1)
+					if (mode < 0 || mode > 2)
 					{
 						printf("dirsync: invalid -m %d\n",mode);
 						Usage();
@@ -1140,13 +1328,23 @@ int main(int argc,char **argv)
 		printf("dirsync: source and destination not specified\nplease try dirsync -h for usage\n");
 		exit(1);
 	}
-	
+
+	/**
+	 * Allocated buffer 1 to read and 2 to verify
+	 */
 	buffer  = (char *)CheckedAlloc(bufferSize);
 	buffer1 = (char *)CheckedAlloc(bufferSize);
+	
 	time(&start);
 
 	RemoveDirsep(argv[optind]);
 	RemoveDirsep(argv[optind+1]);
+
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"ARGS   %s %s\n",argv[optind],argv[optind+1]);
+	}
 	
 	dirsync(argv[optind],argv[optind+1]);
 	time(&end);
@@ -1157,12 +1355,24 @@ int main(int argc,char **argv)
 			kbSec = kbCopied / (end -start);
 		else
 			kbSec = 0;
+		printf("\r                                                                              \r");
 				  
-		printf("%ld files, %ld copied (%lu KB, %ld KB/s), %ld deleted, %ld second(s)",
+		printf("%ld files, %ld copied %lu KB %ld KB/s, %ld deleted, %ld s",
 			   filesChecked,filesCopied,kbCopied,kbSec,filesDeleted,end -start);
 		if (errors)
 			printf(",%ld error(s)",errors);
 		printf("\n");
+	}
+
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"       %ld files, %ld copied (%lu KB, %ld KB/s), %10ld deleted, %10ld second(s)",
+		       filesChecked,filesCopied,kbCopied,kbSec,filesDeleted,end -start);
+		if (errors)
+			fprintf(log,",%ld error(s)",errors);
+		fprintf(log,"\n");
+		fclose(log);
 	}
 
 	return errors == 0 ? 0 : 2;

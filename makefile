@@ -1,4 +1,4 @@
-TARGET=dirsync-1_08
+TARGET=dirsync-1_09
 STDSRC=dirsync.c regcomp.c regexec.c regfree.c
 
 make:
@@ -27,7 +27,7 @@ visualc:
 	make dirsync.exe EXE=dirsync.exe "SOURCE=${STDSRC} getopt.c dirent.c" CC="cl -D__NT__"
 
 #
-# LINUX Version
+# LINUX Version may be work with many Unix system
 #
 linux:
 	make dirsync EXE=dirsync "SOURCE=${STDSRC}" CC="cc -D__LINUX__ -O -o dirsync"

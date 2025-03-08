@@ -1,5 +1,27 @@
 Changes
 ============================================================================
+1.09 01/20/2006
+	Added support for mode 2 (-m 2) in this mode dirsync do not copy or
+	remove any file/directories but only show the difference 
+	using this code :
+		0 name - Directory not present in the source
+		1 name - Directory not present int the destination
+		2 name - File with different size
+		4 name - File not equal.
+	This option work better with -v 0
+
+	Added option -D format (in strftime format) to change the date format
+	used for name the log file . Default is %d-%m-%Y
+
+	Added option -T format (in strftime format) to change the format used
+	to log the time.  Default %d/%m/%Y %H:%M:%S.
+
+	Added option -l file to log all the operation in the specified file
+	if the file name is - the name will be the current date with the format
+	specified in -D option and extension .log.
+	All the operation are logged in the file with the current time using
+	the format specified in -T option.
+
 1.08	11/21/2005
 	Update manual.
 	Added support for option -V to verify copied data. After the copy all 
