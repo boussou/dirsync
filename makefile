@@ -1,4 +1,4 @@
-TARGET=dirsync-1_03
+TARGET=dirsync-1_04
 make:
 	@echo Please select your system and issue the command : make system
 	@echo Supported system are : watcomc,visualc,linux,msdos. The msdos

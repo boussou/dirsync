@@ -1,10 +1,16 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.11 2004/10/18 08:49:48 mviara Exp $
+ * $Id: dirsync.c,v 1.13 2004/10/26 11:22:41 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.13  2004/10/26 11:22:41  mviara
+ * Bug fixed on handling root file system.
+ *
+ * Revision 1.12  2004/10/25 08:45:58  mviara
+ * Corrected error on file count.
+ *
  * Revision 1.11  2004/10/18 08:49:48  mviara
  * Version 1.03
  *
@@ -43,7 +49,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.11 2004/10/18 08:49:48 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.13 2004/10/26 11:22:41 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -172,9 +178,14 @@ static void PrintError(char *cmd,char *obj)
 
 static char * FilePath(char * dest,char * dir,char * file)
 {
+	int len;
 
-	sprintf(dest,"%s%c%s",dir,DIRSEP,file);
-	
+	len = strlen(dir);
+
+	if (dir[len - 1] != DIRSEP)
+		sprintf(dest,"%s%c%s",dir,DIRSEP,file);
+	else
+		sprintf(dest,"%s%s",dir,file);
 	
 	return dest;
 }
@@ -222,7 +233,6 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 	size_t count = 0;
 	size_t perc,oldPerc=101;
 	
-	filesCopied++;
 	
 	if (verbose > 1)
 	{
@@ -311,6 +321,9 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 	
 	if (verbose > 1)
 		printf("\n");
+
+	filesCopied++;
+
 }
 
 
@@ -819,8 +832,16 @@ static void AddEntryOption(Link_T * queue,char *name)
 
 static void RemoveDirsep(char * path)
 {
-	if (path[strlen(path) - 1] == DIRSEP)
-		path[strlen(path) - 1] = '\0';
+	int len;
+	len = strlen(path);
+	
+#ifdef __LINUX__
+	if (len > 1 && path[len - 1] == DIRSEP)
+		path[len - 1] = '\0';
+#else
+	if (len > 1 && path[len - 1] == DIRSEP && path[len - 2] != ':')
+		path[len - 1] = '\0';
+#endif
 }
 
 int main(int argc,char **argv)
@@ -828,7 +849,7 @@ int main(int argc,char **argv)
 	time_t start,end;
 	int o;
 
-	printf("DirSync 1.03 author mario@viara.cn\n\n");
+	printf("DirSync 1.04 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);

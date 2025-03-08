@@ -1,5 +1,9 @@
 Changes
 ============================================================================
+1.04	10/26/2004
+		Corrected error on file copy counter when an error occours.
+		Bug fixed on handling root file system.
+
 1.03	10/18/2004
 		Added a getopt.h to the source distribution.
 		Corrected a bug when the source or destination end in \ 
