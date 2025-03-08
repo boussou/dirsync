@@ -10,12 +10,12 @@
 ** 
 **  This is the public-domain AT&T getopt(3) code.  Hacked by Rich and by Jim.
 */
-static char rcsinfo[] = "$Id: getopt.c,v 1.1.1.1 2004/09/27 13:12:59 mviara Exp $";
+static char rcsinfo[] = "$Id: getopt.c,v 1.2 2004/09/30 18:05:39 mviara Exp $";
 
 #include <stdio.h>
 #include <string.h>
 
-#define ERR(_s, _c) { if (opterr) fprintf (stderr, "%s%c\n", argv[0], _s, _c);}
+#define ERR(_s, _c) { if (opterr) fprintf (stderr, "%s %s %c\n", argv[0], _s, _c);}
 
 int	opterr = 1;
 int	optind = 1;

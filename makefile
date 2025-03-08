@@ -1,4 +1,4 @@
-TARGET=dirsync-1_0.tar
+TARGET=dirsync-1_01
 make:
 	@echo Please select your system and issue the command : make system
 	@echo Supported system are : watcomc,visualc,linux.
@@ -12,12 +12,12 @@ visualc:
 linux:
 	make dirsync EXE=dirsync SOURCE=dirsync.c CC="cc -D__LINUX__ -O -o dirsync"
 
-${EXE}: ${SOURCE}
-	${CC} ${SOURCE}
+${EXE}: ${SOURCE} makefile
+	${CC} -DNDEBUG ${SOURCE}
 
-targz: dirsync.exe dirsync dirsync.c getopt.c dirent.h dirent.c makefile readme.txt \
+tar: dirsync.exe dirsync dirsync.c getopt.c dirent.h dirent.c makefile readme.txt \
 	dirsync.html
-	rm -f ${TARGET} ${TARGET}.gz
-	tar cf ${TARGET} $+
-	gzip ${TARGET}
-
+	rm -f ${TARGET}.tar ${TARGET}.tar.gz ${TARGET}.zip
+	tar cf ${TARGET}.tar $+
+	gzip ${TARGET}.tar
+	pkzip25 -add ${TARGET}.zip $+

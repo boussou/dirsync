@@ -1,15 +1,27 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.1.1.1 2004/09/27 13:12:59 mviara Exp $
+ * $Id: dirsync.c,v 1.5 2004/10/06 03:31:57 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.5  2004/10/06 03:31:57  mviara
+ * Version 1.01
+ *
+ * Revision 1.4  2004/10/02 04:59:04  mviara
+ * Improved performance on large directory.
+ *
+ * Revision 1.3  2004/09/30 19:32:46  mviara
+ * Added -r and -m options.
+ *
+ * Revision 1.2  2004/09/30 18:05:39  mviara
+ * Corrected some english error.
+ *
  * Revision 1.1.1.1  2004/09/27 13:12:59  mviara
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.1.1.1 2004/09/27 13:12:59 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.5 2004/10/06 03:31:57 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,23 +49,33 @@ static char rcsinfo[] = "$Id: dirsync.c,v 1.1.1.1 2004/09/27 13:12:59 mviara Exp
 #include <lcms.h>
 #endif
 
+/**
+ * MSDOS compatibility
+ */
 #ifndef O_BINARY
 #define	O_BINARY	0
 #endif
 
+/**
+ * If not defined define the max path len
+ */
 #ifndef PATH_MAX
 #define PATH_MAX	1024
 #endif
 
 
-//#include "dirent.h"
-
+/**
+ * Structure to hold a link queue
+ */
 typedef struct Link_S
 {
-	struct Link_S * next, * prev;
+	struct Link_S * next;
 } Link_T;
 
 
+/**
+ * Directory entry
+ */
 typedef struct Entry_S
 {
 	Link_T	link;
@@ -66,58 +88,52 @@ typedef struct Entry_S
 	
 } Entry_T;
 
+typedef struct FileArray_S
+{
+	Link_T	head;
+	long	count;
+	Entry_T	**entry;
+} FileArray_T;
+
 typedef struct Directory_S
 {
-	Link_T	listFiles;
-	Link_T	listDirs;
-	long	fileCount;
-	long	dirCount;
+	FileArray_T	files;
+	FileArray_T	dirs;
 } Directory_T;
 
 #define DEFAULT_BUFFER_SIZE	(1024*1024)
 #define DEFAULT_VERBOSE	2
 
-long	filesCopied = 0;
-long	filesDeleted = 0;
-long	filesChecked = 0;
-long	errors = 0;
-
-Link_T	excludedDirs;
-Link_T	excludedFiles;
-char	* buffer;
-int		bufferSize = DEFAULT_BUFFER_SIZE;
-int		verbose = DEFAULT_VERBOSE;
+static long	filesCopied = 0;
+static long	filesDeleted = 0;
+static long	filesChecked = 0;
+static long	errors = 0;
+static int		mode = 0;
+static int		dontRemove = 0;
+static Link_T	excludedDirs;
+static Link_T	excludedFiles;
+static char	* buffer;
+static int	bufferSize = DEFAULT_BUFFER_SIZE;
+static int	verbose = DEFAULT_VERBOSE;
 
 #define MSG_PATH(msg) if (*msg) \
 					  printf(msg);\
 					  *msg=0;
 
 
-void QueueInit(Link_T * link)
+static void QueueInit(Link_T * link)
 {
-	link->next = link->prev = link;
+	link->next = link;
 }
 
-void QueueAdd(Link_T * head,Link_T * link)
+static void QueueAdd(Link_T * head,Link_T * link)
 {
-	link->prev	= head->prev;
-	link->next	= head;
-	head->prev->next = link;
-	head->prev  = link;
+	link->next = head->next;
+	head->next = link;
 }
 
-void QueueUnlink(Link_T * link)
-{
-	link->prev->next = link->next;
-	link->next->prev = link->prev;
-}
 
-int QueueEmpty(Link_T * head)
-{
-	return head->next == head ? 1 : 0;
-}
-
-void PrintError(char *cmd,char *obj)
+static void PrintError(char *cmd,char *obj)
 {
 	int code = errno;
 	char *msg = strerror(code);
@@ -126,7 +142,7 @@ void PrintError(char *cmd,char *obj)
 	errors++;
 }
 
-char * FilePath(char * dest,char * dir,char * file)
+static char * FilePath(char * dest,char * dir,char * file)
 {
 
 #ifdef __NT__
@@ -139,26 +155,10 @@ char * FilePath(char * dest,char * dir,char * file)
 	return dest;
 }
 
-char * Size2String(long size)
-{
-	static char tmp[255];
 
-	if (size < 1024)
-		sprintf(tmp,"%ld Bytes");
-	else if (size < 1024 * 1024)
-		sprintf(tmp,"%ld KB",size/1024);
-	else
-		sprintf(tmp,"%ld MB",size/(1024*1024));
-
-	return tmp;
-}
-
-void CopyAttribute(char *path,struct stat * statb)
+static void CopyAttribute(char *path,struct stat * statb)
 {
 	struct utimbuf time;
-
-
-
 
 	if ((statb->st_mode & S_IFMT) == S_IFREG)
 	{
@@ -177,8 +177,9 @@ void CopyAttribute(char *path,struct stat * statb)
 
 }
 
-void FileUnlink(char * path)
+static void FileUnlink(char * path)
 {
+	
 	if (unlink(path))
 	{
 		chmod(path,0777);
@@ -188,7 +189,7 @@ void FileUnlink(char * path)
 
 }
 
-void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
+static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 {
 	int fds,fdd;
 	char sourcePath[PATH_MAX+1];
@@ -289,7 +290,7 @@ void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 }
 
 
-void FileRemove(char * msg,char *dir,char *file)
+static void FileRemove(char * msg,char *dir,char *file)
 {
 	char  path[PATH_MAX+1];
 	filesDeleted ++;
@@ -305,24 +306,30 @@ void FileRemove(char * msg,char *dir,char *file)
 }
 
 
-void * CheckedAlloc(int size)
+static void * CheckedAlloc(int size)
 {
-	void *p = malloc(size);
+	void *p;
+
+	if (!size)
+		return 0;
+	
+	p = malloc(size);
 
 	if (p == 0)
 	{
-		fprintf(stderr,"dirsync: Out of memory\n");
+		fprintf(stderr,"\ndirsync: Out of memory\n");
 		exit(1);
 	}
 
 	return p;
 }
 
-Entry_T * EntrySearch(Link_T * head,char *name)
+static Entry_T * EntrySearch(Link_T * head,char *name)
 {
 	Link_T * link;
 	Entry_T * e;
 
+	
 	
 	for (link = head->next ; link != head ; link=link->next)
 	{
@@ -336,28 +343,62 @@ Entry_T * EntrySearch(Link_T * head,char *name)
 	return 0;
 }
 
-void EntryFree(Entry_T * e)
+static void EntryAdd(Link_T * queue,char *name,struct stat * statb)
 {
-	QueueUnlink(&e->link);
-	free(e->name);
-	free(e);
-	
-}
-
-void EntryAdd(Link_T * queue,char *name,struct stat * statb)
-{
+	int len = strlen(name)+1;
 	Entry_T * entry;
 
 	entry = CheckedAlloc(sizeof(Entry_T));
-	entry->name = (char *)CheckedAlloc(strlen(name)+1);
-	strcpy(entry->name,name);
+	entry->name = (char *)CheckedAlloc(len);
+	memcpy(entry->name,name,len);
 	if (statb != NULL)
 		entry->statb = * statb;
 
 	QueueAdd(queue,&entry->link);
 }
 
-int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
+static int ArrayCompare(const void *v1,const void *v2)
+{
+	Entry_T * e1 = *( Entry_T **)v1;
+	Entry_T * e2 = *( Entry_T **)v2;
+
+	return strcmp(e1->name,e2->name);
+}
+
+static Entry_T *  ArraySearch(FileArray_T *a,Entry_T *e)
+{
+	Entry_T ** result;
+	result =  (Entry_T **)bsearch(&e,a->entry,a->count,sizeof(Entry_T *),ArrayCompare);
+	if (!result)
+		return 0;
+	return *result;
+}
+
+
+static Entry_T **  ArrayCreate(FileArray_T * a)
+{
+	long i;
+	Link_T * link;
+	Entry_T * e;
+
+	
+	for (a->count = 0,link = a->head.next ; link != &a->head ; link=link->next)
+		a->count++;
+
+	a->entry = CheckedAlloc(a->count*sizeof(Entry_T *));
+
+	for (i = 0,link = a->head.next ; link != &a->head ; link=link->next)
+	{
+		e = (Entry_T *)link;
+		a->entry[i++] = e;
+	}
+
+	qsort(a->entry,a->count,sizeof(Entry_T *),ArrayCompare);
+	
+	return 0;
+}
+
+static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 {
 	struct dirent * d;
 	DIR * dir;
@@ -367,8 +408,8 @@ int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 	
 	fileCount = dirCount = 0;
 	
-	QueueInit(&queue->listFiles);
-	QueueInit(&queue->listDirs);
+	QueueInit(&queue->files.head);
+	QueueInit(&queue->dirs.head);
 	
 	if (stat(dirname,statb))
 	{
@@ -413,14 +454,14 @@ int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 			case	S_IFDIR:
 					if (EntrySearch(&excludedDirs,d->d_name) == NULL)
 					{
-						EntryAdd(&queue->listDirs,d->d_name,&s);
+						EntryAdd(&queue->dirs.head,d->d_name,&s);
 						dirCount++;
 					}
 					break;
 			case	S_IFREG:
 					if (EntrySearch(&excludedFiles,d->d_name) == NULL)
 					{
-						EntryAdd(&queue->listFiles,d->d_name,&s);
+						EntryAdd(&queue->files.head,d->d_name,&s);
 						fileCount++;
 					}
 					break;
@@ -446,14 +487,29 @@ int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 
 	closedir(dir);
 
-	if (verbose > 0)
-		printf("\r");
 	
+	if (verbose > 0)
+	{
+		printf("*");
+		fflush(stdout);
+	}
 
+	/**
+	 * Now create one array for files and directory
+	 */
+	ArrayCreate(&queue->files);
+	ArrayCreate(&queue->dirs);
+	
+	if (verbose > 0)
+	{
+		printf("\010 \010\r");
+		fflush(stdout);
+	}
+	
 	return 0;
 }
 
-void Mkdir(char * msg,char * path)
+static void Mkdir(char * msg,char * path)
 {
 	if (verbose > 1)
 	{
@@ -471,7 +527,8 @@ void Mkdir(char * msg,char * path)
 	}
 
 }
-void Rmdir(char * msg,char *dirname,char *file)
+
+static void Rmdir(char * msg,char *dirname,char *file)
 {
 	char  path[PATH_MAX+1];
 
@@ -493,57 +550,74 @@ void Rmdir(char * msg,char *dirname,char *file)
 	}
 }
 
-void RmdirAll(char *msg,char *dirname,char *file)
+static void FreeArray(FileArray_T * a)
+{
+	long i;
+	Entry_T * e;
+
+	for (i = 0 ; i < a->count ; i++)
+	{
+		e = a->entry[i];
+		free(e->name);
+		free(e);
+	}
+
+	if (a->entry)
+		free(a->entry);
+}
+
+static void FreeDirectory(Directory_T * dir)
+{
+	FreeArray(&dir->files);
+	FreeArray(&dir->dirs);
+}
+	
+static void RmdirAll(char *msg,char *dirname,char *file)
 {
 	char path[PATH_MAX+1];
 	struct stat statb;
 	Directory_T dir;
-	Link_T * link,* next;
 	Entry_T * e;
-
+	long i;
+	
 	FilePath(path,dirname,file);		
 	
 	if (ScanDir(path,&dir,&statb))
 		return;
 	
 	// Step 1. Remove all file
-	for (link = dir.listFiles.next ; link != &dir.listFiles ; link=next)
+	for (i = 0 ; i  < dir.files.count ; i++)
 	{
-		next = link->next;
-		e = (Entry_T *)link;
+		e = dir.files.entry[i];
 
 		FileRemove(msg,path,e->name);
-		EntryFree(e);
 	}
 
 	// Step 2. Remove all dir
-	for (link = dir.listDirs.next ; link != &dir.listDirs ; link=next)
+	for (i = 0 ; i < dir.dirs.count ; i++)
 	{
-		next = link->next;
-		e = (Entry_T *)link;
+		e = dir.dirs.entry[i];
 
 		RmdirAll(msg,path,e->name);
-		EntryFree(e);
 	}
 
 	// Step 3. Remove dir
 
 	Rmdir(msg,dirname,file);
-	
-	assert(QueueEmpty(&dir.listFiles));
-	assert(QueueEmpty(&dir.listDirs));
+
+	FreeDirectory(&dir);
 }
 
-int dirsync(char *source,char *dest)
+static int dirsync(char *source,char *dest)
 {
 	char sourcePath[PATH_MAX+1],destPath[PATH_MAX+1];
 	char msg[80*2+5];
 	Directory_T dirSource,dirDest;
-	Link_T * link,*next;
 	Entry_T * se , *de;
 	int needCopy;
 	struct stat statSource,statDest;
 	int firstTime = 1;
+	long i;
 	
 	sprintf(msg,"FROM   %-70.70s\nTO     %-70.70s\n",source,dest);
 	
@@ -556,60 +630,71 @@ int dirsync(char *source,char *dest)
 
 	
 	// Step 1. Delete all file not present in the source dir
-	for (link = dirDest.listFiles.next ; link != &dirDest.listFiles ; link=next)
+	for (i = 0 ; i < dirDest.files.count ; i++)
 	{
-		next = link->next;
-		de = (Entry_T *)link;
-		se = EntrySearch(&dirSource.listFiles,de->name);
+		de = dirDest.files.entry[i];
+		se = ArraySearch(&dirSource.files,de);
 
 		if (se == NULL)
 		{
-			if (firstTime)
+			if (!dontRemove)
 			{
-				firstTime = 0;
-				chmod(dest,0777);
-			}				
-			FileRemove(msg,dest,de->name);
-			EntryFree(de);
+				if (firstTime)
+				{
+					firstTime = 0;
+					chmod(dest,0777);
+				}				
+				FileRemove(msg,dest,de->name);
+			}
 		}
 	}
 
 	// Step 2. Delete all directories not present in the source
-	for (link = dirDest.listDirs.next ; link != &dirDest.listDirs ; link=next)
+	for (i = 0 ; i < dirDest.dirs.count; i++)
 	{
-		next = link->next;
-		de = (Entry_T *)link;
-		se = EntrySearch(&dirSource.listDirs,de->name);
+		de = dirDest.dirs.entry[i];
+		se = ArraySearch(&dirSource.dirs,de);
 
 		if (se == NULL)
 		{
-			if (firstTime)
+			if (!dontRemove)
 			{
-				firstTime = 0;
-				chmod(dest,0777);
-			}				
+				if (firstTime)
+				{
+					firstTime = 0;
+					chmod(dest,0777);
+				}					
 
-			RmdirAll(msg,dest,de->name);
-			EntryFree(de);
+				RmdirAll(msg,dest,de->name);
+			}
 		}
 	}
 	
 	// Step 3. Copy all file changed form source to dest
-	for (link = dirSource.listFiles.next ; link != &dirSource.listFiles ; link=next)
+	for (i = 0 ; i < dirSource.files.count ; i++)
 	{
-		next = link->next;
-		
-		se = (Entry_T *)link;
-		de = EntrySearch(&dirDest.listFiles,se->name);
+		se = dirSource.files.entry[i];
+		de = ArraySearch(&dirDest.files,se);
 
 		needCopy = 0;
 		filesChecked++;
-		// File not prsent in the destination
+		
+		// File not present in the destination
 		if (de == NULL)
 			needCopy = 1;
-		else if (se->statb.st_size != de->statb.st_size ||
-				 se->statb.st_mtime != de->statb.st_mtime)
-			needCopy = 1;
+		else switch (mode)
+		{
+			case	0:
+					if (se->statb.st_size != de->statb.st_size ||
+					  se->statb.st_mtime != de->statb.st_mtime)
+						needCopy = 1;
+					break;
+			case	1:
+					if (se->statb.st_mtime > de->statb.st_mtime)
+						needCopy = 1;
+					break;
+		}
+							
 /*
 		printf("size %ld,%ld mtime %ld,%ld\n",se->statb.st_size,
 											  de->statb.st_size,
@@ -625,20 +710,15 @@ int dirsync(char *source,char *dest)
 
 			FileCopy(msg,source,dest,se);
 		}
-		EntryFree(se);
-
-		if (de != NULL)
-			EntryFree(de);
 			
 	}
 
 	// Step 4. Call dirsync in all directory
-	for (link = dirSource.listDirs.next ; link != &dirSource.listDirs ; link=next)
+	for (i = 0 ; i < dirSource.dirs.count ; i++)
 	{
-		next = link->next;
 
-		se = (Entry_T *)link;
-		de = EntrySearch(&dirDest.listDirs,se->name);
+		se = dirSource.dirs.entry[i];
+		de = ArraySearch(&dirDest.dirs,se);
 		FilePath(destPath,dest,se->name);
 		FilePath(sourcePath,source,se->name);
 
@@ -646,11 +726,7 @@ int dirsync(char *source,char *dest)
 		{
 			Mkdir(msg,destPath);
 		}
-		else
-			EntryFree(de);
 
-
-		EntryFree(se);
 
 		dirsync(sourcePath,destPath);
 	}
@@ -659,17 +735,14 @@ int dirsync(char *source,char *dest)
 	if (firstTime == 0)
 		CopyAttribute(dest,&statSource);
 
-	/* Onlyfor debug */
-	assert(QueueEmpty(&dirDest.listDirs));
-	assert(QueueEmpty(&dirDest.listFiles));
-	assert(QueueEmpty(&dirSource.listDirs));
-	assert(QueueEmpty(&dirSource.listFiles));
+	FreeDirectory(&dirDest);
+	FreeDirectory(&dirSource);
 	
 	return 0;
 }
 
 
-void Usage()
+static void Usage()
 {
 	printf("usage : dirsync [option(s)] source dest\n");
 	printf("\tsource\tsoure directory (must exist)\n");
@@ -677,9 +750,14 @@ void Usage()
 	printf("\t-h\tDisplay this message\n");
 	printf("\t-v lvl\tset verbose level (default %d,min 0,max 9)\n",DEFAULT_VERBOSE);
 	printf("\t-q\tQuiet mode (same result of -v 0)\n");
-	printf("\t-X name\tExclude directory 'name' from scanning (defualt . ..)\n");
+	printf("\t-X name\tExclude directory 'name' from scanning (default . ..)\n");
 	printf("\t-x name\tExclude file 'name' from scanning\n");
 	printf("\t-b size\tSet the read/write buffer size (default %d)\n",DEFAULT_BUFFER_SIZE);
+	printf("\t-m mode\tSet copy file mode,always missing file are copied\n");
+	printf("\t\t0 - Copy file if have different size or date (default)\n");
+	printf("\t\t1 - Copy file if the destination is oldest than source\n");
+	printf("\t-r\tDon't remove file/directory missed in the source\n");
+	
 }
 
 int main(int argc,char **argv)
@@ -687,7 +765,7 @@ int main(int argc,char **argv)
 	time_t start,end;
 	int o;
 
-	printf("dirsync 1.0 by mario@viara.cn\n\n");
+	printf("DirSync 1.01 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
@@ -698,13 +776,27 @@ int main(int argc,char **argv)
 
 
 
-	while (( o = getopt(argc,argv,"qhv:x:X:b:")) != -1)
+	while (( o = getopt(argc,argv,"qhv:x:X:b:m:r")) != -1)
 	{
 		switch (o)
 		{
+			case	'r':
+					dontRemove = 1;
+					break;
+					
+			case	'm':
+					mode = atoi(optarg);
+					if (mode < 0 || mode > 1)
+					{
+						printf("dirsync: invalid -m %d\n",mode);
+						Usage();
+						return 2;
+					}
+					break;
 			case	'b':
 					bufferSize = atoi(optarg);
 					break;
+					
 			case	'x':
 					EntryAdd(&excludedFiles,optarg,NULL);
 					break;
