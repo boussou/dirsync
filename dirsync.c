@@ -1,10 +1,18 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.15 2004/11/10 18:14:37 mviara Exp $
+ * $Id: dirsync.c,v 1.17 2004/11/25 19:17:38 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.17  2004/11/25 19:17:38  mviara
+ * Tested in win32 enviroment.
+ *
+ * Revision 1.16  2004/11/25 18:58:33  mviara
+ *
+ * Added the "Henry Spencer's regular expression library" to support regular
+ * expression matching in exclude files/directories.
+ *
  * Revision 1.15  2004/11/10 18:14:37  mviara
  * Version 1.05 Win32
  *
@@ -56,7 +64,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.15 2004/11/10 18:14:37 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.17 2004/11/25 19:17:38 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,6 +91,8 @@ static char rcsinfo[] = "$Id: dirsync.c,v 1.15 2004/11/10 18:14:37 mviara Exp $"
 #include <dirent.h>
 #include <unistd.h>
 #endif
+
+#include "regex.h"
 
 #ifdef __LINUX__
 #define DIRSEP	'/'
@@ -129,6 +139,17 @@ typedef struct Entry_S
 	
 } Entry_T;
 
+/**
+ * Regular expression entry
+ */
+typedef struct
+{
+	Link_T	link;
+	regex_t regex;
+	char *  name;
+} RegexEntry_T;
+
+
 typedef struct FileArray_S
 {
 	Link_T	head;
@@ -154,10 +175,12 @@ static long	filesCopied = 0;
 static long	filesDeleted = 0;
 static long	filesChecked = 0;
 static long	errors = 0;
-static int		mode = 0;
-static int		dontRemove = 0;
+static int	mode = 0;
+static int	dontRemove = 0;
 static Link_T	excludedDirs;
 static Link_T	excludedFiles;
+static Link_T	excludedRegex;
+
 static char	* buffer;
 static int	bufferSize = DEFAULT_BUFFER_SIZE;
 static int	verbose = DEFAULT_VERBOSE;
@@ -374,6 +397,30 @@ static void * CheckedAlloc(int size)
 	return p;
 }
 
+static int RegexSearch(Link_T * head,char *name)
+{
+	Link_T * link;
+	RegexEntry_T * e;
+
+	
+
+	for (link = head->next ; link != head ; link=link->next)
+	{
+		e = (RegexEntry_T *)link;
+
+		if (regexec(&e->regex,name,0,NULL,0) == 0)
+		{
+			printf("%s matched by %s \n",name,e->name);
+
+			return 1;
+
+		}
+		
+	}
+
+	return 0;
+}
+
 static Entry_T * EntrySearch(Link_T * head,char *name)
 {
 	Link_T * link;
@@ -405,6 +452,22 @@ static void EntryAdd(Link_T * queue,char *name,struct stat * statb)
 		entry->statb = * statb;
 
 	QueueAdd(queue,&entry->link);
+}
+
+static void RegexAdd(Link_T * queue,char *name)
+{
+	int len = strlen(name)+1;
+	RegexEntry_T * entry;
+
+	entry = CheckedAlloc(sizeof(RegexEntry_T));
+	entry->name = (char *)CheckedAlloc(len);
+	memcpy(entry->name,name,len);
+	if (regcomp(&entry->regex,name,REG_NOSUB) != 0)
+	{
+		PrintError("regex",name);
+	}
+	else
+		QueueAdd(queue,&entry->link);
 }
 
 static int ArrayCompare(const void *v1,const void *v2)
@@ -491,6 +554,9 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 	while ((d = readdir(dir)) != 0)
 	{
 		FilePath(path,dirname,d->d_name);
+
+		if (RegexSearch(&excludedRegex,path))
+			continue;
 		
 		if (stat(path,&s))
 		{
@@ -805,6 +871,7 @@ static void Usage()
 	printf("\t-q\tQuiet mode (same result of -v 0)\n");
 	printf("\t-X name\tExclude directory name (1) from scanning (default . ..)\n");
 	printf("\t-x name\tExclude file name (1) from scanning\n");
+	printf("\t-e name\tExclude regular expression name (1) from scanning\n");
 	printf("\t-b size\tSet the read/write buffer size (default %d)\n",DEFAULT_BUFFER_SIZE);
 	printf("\t-m mode\tSet copy file mode,always missing file are copied\n");
 	printf("\t\t0 - Copy file if have different size or date (default)\n");
@@ -813,6 +880,34 @@ static void Usage()
 	printf("\n\t\t(1) If name begin with @ for example @list the names will be\n");
 	printf("\t\tread from a text file named list.\n");
 	
+}
+
+static void AddRegexOption(Link_T * queue,char *name)
+{
+	FILE * fd;
+	char buffer[PATH_MAX+1];
+
+	if (*name != '@')
+	{
+		RegexAdd(queue,name);
+		return;
+	}
+	name++;
+
+	if ((fd = fopen(name,"rt")) == NULL)
+	{
+		PrintError("fopen",name);
+		exit(1);
+	}
+
+	while (fscanf(fd,"%s",buffer) == 1)
+	{
+		RegexAdd(queue,name);
+	}
+
+	fclose(fd);
+
+
 }
 
 static void AddEntryOption(Link_T * queue,char *name)
@@ -835,7 +930,7 @@ static void AddEntryOption(Link_T * queue,char *name)
 
 	while (fscanf(fd,"%s",buffer) == 1)
 	{
-		printf("Adding %s\n",buffer);
+		EntryAdd(queue,name,NULL);
 	}
 
 	fclose(fd);
@@ -862,10 +957,11 @@ int main(int argc,char **argv)
 	time_t start,end;
 	int o;
 
-	printf("DirSync 1.05 author mario@viara.cn\n\n");
+	printf("DirSync 1.06 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
+	QueueInit(&excludedRegex);
 	
 	// Add default excluded dir
 	EntryAdd(&excludedDirs,".",NULL);
@@ -873,7 +969,7 @@ int main(int argc,char **argv)
 
 
 
-	while (( o = getopt(argc,argv,"qhv:x:X:b:m:r")) != -1)
+	while (( o = getopt(argc,argv,"qhv:x:X:b:m:re:")) != -1)
 	{
 		switch (o)
 		{
@@ -893,7 +989,10 @@ int main(int argc,char **argv)
 			case	'b':
 					bufferSize = atoi(optarg);
 					break;
-					
+
+			case	'e':
+					AddRegexOption(&excludedRegex,optarg);
+					break;
 			case	'x':
 					AddEntryOption(&excludedFiles,optarg);
 					//EntryAdd(&excludedFiles,optarg,NULL);

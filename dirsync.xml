@@ -34,9 +34,9 @@
 	</Company_Info>
 	<Program_Info>
 		<Program_Name>dirsync</Program_Name>
-		<Program_Version>1.05</Program_Version>
-		<Program_Release_Month>10</Program_Release_Month>
-		<Program_Release_Day>26</Program_Release_Day>
+		<Program_Version>1.06</Program_Version>
+		<Program_Release_Month>11</Program_Release_Month>
+		<Program_Release_Day>25</Program_Release_Day>
 		<Program_Release_Year>2004</Program_Release_Year>
 		<Program_Cost_Dollars>0</Program_Cost_Dollars>
 		<Program_Cost_Other_Code />
@@ -46,7 +46,7 @@
 		<Program_Install_Support>Install Only</Program_Install_Support>
 		<Program_OS_Support>WinNT 3.x,WinNT 4.x,Windows2000,WinXP,Windows2003,Linux,MS-DOS</Program_OS_Support>
 		<Program_Language>English</Program_Language>
-		<Program_Change_Info>Some minor bug fixed</Program_Change_Info>
+		<Program_Change_Info>Added regex match in exclude file/directory.</Program_Change_Info>
 		<Program_Specific_Category />
 		<Program_Category_Class>System Utilities::Backup &amp; Restore</Program_Category_Class>
 		<Program_Categories />
@@ -80,7 +80,7 @@
 			<Char_Desc_80>DirSync is a Directory Synchronizer</Char_Desc_80>
 			<Char_Desc_250>DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical. </Char_Desc_250>
 			<Char_Desc_450>DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical. Can be used to make incremental copy of large data. For example if your file server is in the /data you can make a copy in /backup with the command : dirsync /data /backup the first time all data will be copied but when you issue again the command only the changed file are copied. </Char_Desc_450>
-			<Char_Desc_2000>DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical. Can be used to make incremental copy of large data. For example if your file server is in the /data you can make a copy in /backup with the command : dirsync /data /backup the first time all data will be copied but when you issue again the command only the changed file are copied. Both source and executable for win32 and linux are included in the distribution</Char_Desc_2000>
+			<Char_Desc_2000>DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical. Can be used to make incremental copy of large data. For example if your file server is in the /data you can make a copy in /backup with the command : dirsync /data /backup the first time all data will be copied but when you issue again the command only the changed file are copied. Both source and executable for win32 and linux are included in the distribution. File can be excluded by name or regular expression pattern match.</Char_Desc_2000>
 		</English>
 	</Program_Descriptions>
 	<Web_Info>
@@ -92,8 +92,8 @@
 			<Application_XML_File_URL>http://www.viara.cn/padfile/dirsync.xml</Application_XML_File_URL>
 		</Application_URLs>
 		<Download_URLs>
-			<Primary_Download_URL>http://www.viara.cn/download/dirsync-1_05.zip</Primary_Download_URL>
-			<Secondary_Download_URL>http://www.viara.cn/download/dirsync-1_05.tar.gz</Secondary_Download_URL>
+			<Primary_Download_URL>http://www.viara.cn/download/dirsync-1_06.zip</Primary_Download_URL>
+			<Secondary_Download_URL>http://www.viara.cn/download/dirsync-1_06.tar.gz</Secondary_Download_URL>
 			<Additional_Download_URL_1 />
 			<Additional_Download_URL_2 />
 		</Download_URLs>
