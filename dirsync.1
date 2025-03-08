@@ -1,0 +1,56 @@
+.TH UD 1 "07 October 2004" "Dirsync 1.02 Release"
+.UC 6
+.SH NAME
+dirsync \- Directory Synchronizer
+.SH SYNOPSIS
+.B dirsync [-h] [-v
+.I level
+.B ] [-q] [-X
+.I dir
+.B ] [-x
+.I file
+.B ] [-r] [-b
+.I size
+.B ] [-m
+.I mode
+.B ] source dest
+.SH DESCRIPTION
+DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical.
+.SH OPTIONS
+.TP
+.B \-h \
+Display a short message help.
+.TP
+.B \-v \ level
+Specify the verbosity level (default 0).
+.TP
+.B \-q \
+Quiet mode (the same effect of -v 0).
+.TP
+.B \-X \ name (1)
+Exclude the directory named name.
+.TP
+.B \-x \ name (1)
+Exclude the file named name.
+.TP
+.B \-b \ size
+Set the buffer size used for the copy, default 1048576.
+.TP
+.B \-m \ mode
+Set file mode copy.
+.IP
+0 - Copy if have different size or date.
+.IP
+1 - Copy if the destination is oldest than source.
+.TP
+.B \-r \
+Don't remove files/directories missed in the source.
+.TP
+(1) If name start with @ the remaining characters will be used as a file name. The file must contain space separated word used in sequence for the option.
+.SH "REPORTING BUGS"
+Report bugs to <mario@viara.cn>.
+.SH "SEE ALSO"
+The latest version can be downloaded from http://www.viara.cn/en/dirsync.htm
+.SH AUTHOR
+Mario Viara
+

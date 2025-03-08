@@ -1,10 +1,26 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.5 2004/10/06 03:31:57 mviara Exp $
+ * $Id: dirsync.c,v 1.9 2004/10/08 18:15:42 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.9  2004/10/08 18:15:42  mviara
+ *
+ * Added option from a text file.
+ *
+ * Revision 1.8  2004/10/07 13:59:58  mviara
+ *
+ * Improved compatibility (removed <lcms.h>)
+ *
+ * Revision 1.7  2004/10/07 13:55:33  mviara
+ *
+ * Added install for linux.
+ * Added #include <unistd.h> to compile in athore linux system.
+ *
+ * Revision 1.6  2004/10/07 13:40:40  mviara
+ * Added support for MSDOS.
+ *
  * Revision 1.5  2004/10/06 03:31:57  mviara
  * Version 1.01
  *
@@ -21,7 +37,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.5 2004/10/06 03:31:57 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.9 2004/10/08 18:15:42 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +47,7 @@ static char rcsinfo[] = "$Id: dirsync.c,v 1.5 2004/10/06 03:31:57 mviara Exp $";
 #include <assert.h>
 #include <fcntl.h>
 #include <errno.h>
-#ifdef __NT__
+#ifndef __LINUX__
 #include <io.h>
 #include <sys/utime.h>
 #include <limits.h>
@@ -46,7 +62,7 @@ static char rcsinfo[] = "$Id: dirsync.c,v 1.5 2004/10/06 03:31:57 mviara Exp $";
 #ifdef __LINUX__
 #include <utime.h>
 #include <dirent.h>
-#include <lcms.h>
+#include <unistd.h>
 #endif
 
 /**
@@ -145,7 +161,7 @@ static void PrintError(char *cmd,char *obj)
 static char * FilePath(char * dest,char * dir,char * file)
 {
 
-#ifdef __NT__
+#ifndef __LINUX__
 	sprintf(dest,"%s\\%s",dir,file);
 #else
 	sprintf(dest,"%s/%s",dir,file);
@@ -750,22 +766,53 @@ static void Usage()
 	printf("\t-h\tDisplay this message\n");
 	printf("\t-v lvl\tset verbose level (default %d,min 0,max 9)\n",DEFAULT_VERBOSE);
 	printf("\t-q\tQuiet mode (same result of -v 0)\n");
-	printf("\t-X name\tExclude directory 'name' from scanning (default . ..)\n");
-	printf("\t-x name\tExclude file 'name' from scanning\n");
+	printf("\t-X name\tExclude directory name (1) from scanning (default . ..)\n");
+	printf("\t-x name\tExclude file name (1) from scanning\n");
 	printf("\t-b size\tSet the read/write buffer size (default %d)\n",DEFAULT_BUFFER_SIZE);
 	printf("\t-m mode\tSet copy file mode,always missing file are copied\n");
 	printf("\t\t0 - Copy file if have different size or date (default)\n");
 	printf("\t\t1 - Copy file if the destination is oldest than source\n");
 	printf("\t-r\tDon't remove file/directory missed in the source\n");
+	printf("\n\t\t(1) If name begin with @ for example @list the names will be\n");
+	printf("\t\tread from a text file named list.\n");
 	
 }
+
+static void AddEntryOption(Link_T * queue,char *name)
+{
+	FILE * fd;
+	char buffer[PATH_MAX+1];
+	
+	if (*name != '@')
+	{
+		EntryAdd(queue,name,NULL);
+		return;
+	}
+	name++;
+
+	if ((fd = fopen(name,"rt")) == NULL)
+	{
+		PrintError("fopen",name);
+		exit(1);
+	}
+
+	while (fscanf(fd,"%s",buffer) == 1)
+	{
+		printf("Adding %s\n",buffer);
+	}
+
+	fclose(fd);
+	
+}
+
+
 
 int main(int argc,char **argv)
 {
 	time_t start,end;
 	int o;
 
-	printf("DirSync 1.01 author mario@viara.cn\n\n");
+	printf("DirSync 1.02 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
@@ -798,10 +845,13 @@ int main(int argc,char **argv)
 					break;
 					
 			case	'x':
-					EntryAdd(&excludedFiles,optarg,NULL);
+					AddEntryOption(&excludedFiles,optarg);
+					//EntryAdd(&excludedFiles,optarg,NULL);
 					break;
+					
 			case	'X':
-					EntryAdd(&excludedDirs,optarg,NULL);
+					AddEntryOption(&excludedDirs,optarg);
+					//EntryAdd(&excludedDirs,optarg,NULL);
 					break;
 			case	'q':
 					verbose = 0;

@@ -1,7 +1,11 @@
-TARGET=dirsync-1_01
+TARGET=dirsync-1_02
 make:
 	@echo Please select your system and issue the command : make system
-	@echo Supported system are : watcomc,visualc,linux.
+	@echo Supported system are : watcomc,visualc,linux,msdos. The msdos
+	@echo versione require a OpenWatcom compiler.
+	@echo The linux version can be installed with : make install
+msdos:
+	make dirsync.exe EXE=dirsync.exe "SOURCE=dirsync.c getopt.c" CC="wcl386 -wx -ox -bt=dos"
 
 watcomc:
 	make dirsync.exe EXE=dirsync.exe "SOURCE=dirsync.c getopt.c" CC="wcl386 -D__NT__ -wx -ox"
@@ -15,9 +19,16 @@ linux:
 ${EXE}: ${SOURCE} makefile
 	${CC} -DNDEBUG ${SOURCE}
 
-tar: dirsync.exe dirsync dirsync.c getopt.c dirent.h dirent.c makefile readme.txt \
-	dirsync.html
+tar: dirsync.exe dirsync dirsync.c getopt.c dirent.h dirent.c makefile readme.txt dirsync.1
 	rm -f ${TARGET}.tar ${TARGET}.tar.gz ${TARGET}.zip
 	tar cf ${TARGET}.tar $+
 	gzip ${TARGET}.tar
 	pkzip25 -add ${TARGET}.zip $+
+
+
+#
+# Sample install tested on Suse 9.0
+# 
+install:
+	install -D -m 755 dirsync $(DESTDIR)/usr/bin/dirsync
+	install -D -m 644 dirsync.1 $(DESTDIR)/usr/local/man/man1/dirsync.1
