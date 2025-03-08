@@ -1,4 +1,4 @@
-TARGET=dirsync-1_04
+TARGET=dirsync-1_05
 make:
 	@echo Please select your system and issue the command : make system
 	@echo Supported system are : watcomc,visualc,linux,msdos. The msdos
@@ -9,7 +9,7 @@ make:
 # MSDOS require watcomc
 #
 msdos:
-	make dirsync.exe EXE=dirsync.exe "SOURCE=dirsync.c getopt.c" CC="wcl386 -wx -ox -bt=dos"
+	make dirsync.exe EXE=dirsync.exe "SOURCE=dirsync.c getopt.c" CC="wcl386 -D__MSDOS__ -wx -ox -bt=dos"
 
 #
 # WIN32 version with WATCOMC

@@ -1,10 +1,17 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.13 2004/10/26 11:22:41 mviara Exp $
+ * $Id: dirsync.c,v 1.15 2004/11/10 18:14:37 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.15  2004/11/10 18:14:37  mviara
+ * Version 1.05 Win32
+ *
+ * Revision 1.14  2004/11/05 16:23:44  mviara
+ *
+ * Version 1.05
+ *
  * Revision 1.13  2004/10/26 11:22:41  mviara
  * Bug fixed on handling root file system.
  *
@@ -49,7 +56,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.13 2004/10/26 11:22:41 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.15 2004/11/10 18:14:37 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,7 +142,12 @@ typedef struct Directory_S
 	FileArray_T	dirs;
 } Directory_T;
 
+#ifdef __MSDOS__
+#define DEFAULT_BUFFER_SIZE	(1024*64)
+#else
 #define DEFAULT_BUFFER_SIZE	(1024*1024)
+#endif
+
 #define DEFAULT_VERBOSE	2
 
 static long	filesCopied = 0;
@@ -273,6 +285,7 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 		if (nread < 0)
 		{
 			PrintError("read",sourcePath);
+			break;
 		}
 
 		if (nread == 0)
@@ -849,7 +862,7 @@ int main(int argc,char **argv)
 	time_t start,end;
 	int o;
 
-	printf("DirSync 1.04 author mario@viara.cn\n\n");
+	printf("DirSync 1.05 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);

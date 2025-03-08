@@ -34,7 +34,7 @@
 	</Company_Info>
 	<Program_Info>
 		<Program_Name>dirsync</Program_Name>
-		<Program_Version>1.04</Program_Version>
+		<Program_Version>1.05</Program_Version>
 		<Program_Release_Month>10</Program_Release_Month>
 		<Program_Release_Day>26</Program_Release_Day>
 		<Program_Release_Year>2004</Program_Release_Year>
@@ -92,8 +92,8 @@
 			<Application_XML_File_URL>http://www.viara.cn/padfile/dirsync.xml</Application_XML_File_URL>
 		</Application_URLs>
 		<Download_URLs>
-			<Primary_Download_URL>http://www.viara.cn/download/dirsync-1_04.zip</Primary_Download_URL>
-			<Secondary_Download_URL>http://www.viara.cn/download/dirsync-1_04.tar.gz</Secondary_Download_URL>
+			<Primary_Download_URL>http://www.viara.cn/download/dirsync-1_05.zip</Primary_Download_URL>
+			<Secondary_Download_URL>http://www.viara.cn/download/dirsync-1_05.tar.gz</Secondary_Download_URL>
 			<Additional_Download_URL_1 />
 			<Additional_Download_URL_2 />
 		</Download_URLs>
