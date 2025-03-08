@@ -1,0 +1,102 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta content="text/html; charset=ISO-8859-1"
+ http-equiv="content-type">
+  <title>Dyrsync manual</title>
+</head>
+<body>
+<h1>DirSync 1.0<br>
+</h1>
+<h2>Introduction</h2>
+<br>
+<hr style="width: 100%; height: 2px;">DirSync is a Directory
+Synchronizer this utility take two argument the source directory and
+the destination and make recursively the two directories identical. Can
+be used to make incremental copy of large data. For example if your
+file server is in the <span style="font-weight: bold;">/data</span>
+you can make a copy in <span style="font-weight: bold;">/backup</span>
+with the command : <span style="font-style: italic;">dirsync /data
+/backup</span> the first time all data will be copied but when you
+issue again the command only the changed file are copied. <br>
+<br>
+<span style="font-weight: bold;">BE CAREFULLY BECAUSE IF SOME FILES OR
+DIRECTORIES ARE DELETED FROM THE SOURCE WHEN YOU SYNCHRONIZE THE DATA
+THE FILES OR DIRECTORIES WILL BE DELETED ALSO IN THE DESTINATION.</span><br
+ style="font-weight: bold;">
+<br>
+<h2>Installation<br>
+</h2>
+<hr style="width: 100%; height: 2px;">DirSync became with the full
+source for many system the makefile and the conditional compilation are
+tested for Linux and win32. To compile DirSync is sufficient to issue
+the following command : <span style="font-style: italic;">make system </span>where
+system is the name of your system the supported system are
+Linux,watcomc,visualc but it is very simple add support for other unix
+family.<br>
+<br>
+<h2>Files</h2>
+<hr style="width: 100%; height: 2px;">The distribution come with the
+following files :<br>
+<br>
+<table
+ style="margin-left: auto; margin-right: auto; width: 50%; text-align: left;"
+ border="1" cellpadding="2" cellspacing="2">
+  <tbody>
+    <tr>
+      <td style="vertical-align: top; font-weight: bold;">File name<br>
+      </td>
+      <td style="vertical-align: top; font-weight: bold;">Description<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top; text-align: justify;">dirsync.c<br>
+      </td>
+      <td style="vertical-align: top;">Dirsync source.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">getopt.c<br>
+      </td>
+      <td style="vertical-align: top;">getopt for win32.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">dirent.c/dirent.h<br>
+      </td>
+      <td style="vertical-align: top;">opendir support for win32.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">dirsync<br>
+      </td>
+      <td style="vertical-align: top;">Executable for linux<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">dirsync.exe<br>
+      </td>
+      <td style="vertical-align: top;">Executable for win32<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">dirsync.html<br>
+      </td>
+      <td style="vertical-align: top;">This file.<br>
+      </td>
+    </tr>
+    <tr>
+      <td style="vertical-align: top;">readme.txt<br>
+      </td>
+      <td style="vertical-align: top;">Release notes.<br>
+      </td>
+    </tr>
+  </tbody>
+</table>
+<br>
+<br>
+For any question or suggestion&nbsp; contact me at mario@viara.cn<br>
+<br>
+<br>
+</body>
+</html>
