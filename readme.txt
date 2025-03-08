@@ -1,11 +1,16 @@
 Changes
 ============================================================================
-1.06 11/26/2004
+1.07	12/28/2004
+	Added warning when file size change during a copy.
+	Improved statistics of copied file(s).
+	Removed a printf in mached regular expression.
+
+1.06	11/26/2004
 	Added thre "Henry Spencer's regular expression library" to support
 	the option -e to exclude files/directories based on regular expression.
 	Bug fixed in the option -x and -X with a file argument.
 
-1.05 11/10/2004
+1.05	11/10/2004
 	Corrected a bug in reading file without permission.
 	Corrected bug in MSDOS version.
 

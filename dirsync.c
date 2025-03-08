@@ -1,10 +1,19 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.17 2004/11/25 19:17:38 mviara Exp $
+ * $Id: dirsync.c,v 1.20 2004/12/28 15:09:55 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.20  2004/12/28 15:09:55  mviara
+ * Added warning when file size change during a copy.
+ *
+ * Revision 1.19  2004/12/07 00:15:47  mviara
+ * Improved statistics.
+ *
+ * Revision 1.18  2004/11/30 17:09:43  mviara
+ * Removed unnecessary printf.
+ *
  * Revision 1.17  2004/11/25 19:17:38  mviara
  * Tested in win32 enviroment.
  *
@@ -64,7 +73,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.17 2004/11/25 19:17:38 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.20 2004/12/28 15:09:55 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -175,6 +184,7 @@ static long	filesCopied = 0;
 static long	filesDeleted = 0;
 static long	filesChecked = 0;
 static long	errors = 0;
+static long	kbCopied = 0;
 static int	mode = 0;
 static int	dontRemove = 0;
 static Link_T	excludedDirs;
@@ -360,6 +370,15 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 
 	filesCopied++;
 
+	if (count !=  e->statb.st_size)
+	{
+		fprintf(stderr,"dirsync: Size of %s changed, expected %lu copied %lu\n",
+			  sourcePath,e->statb.st_size,count);
+	}
+	
+	count /= 1024;
+	kbCopied += count;
+
 }
 
 
@@ -403,14 +422,14 @@ static int RegexSearch(Link_T * head,char *name)
 	RegexEntry_T * e;
 
 	
-
 	for (link = head->next ; link != head ; link=link->next)
 	{
 		e = (RegexEntry_T *)link;
+		//printf("regsearch %s with %s\n",e->name,name);
 
 		if (regexec(&e->regex,name,0,NULL,0) == 0)
 		{
-			printf("%s matched by %s \n",name,e->name);
+			//printf("%s matched by %s \n",name,e->name);
 
 			return 1;
 
@@ -955,9 +974,10 @@ static void RemoveDirsep(char * path)
 int main(int argc,char **argv)
 {
 	time_t start,end;
+	long kbSec;
 	int o;
 
-	printf("DirSync 1.06 author mario@viara.cn\n\n");
+	printf("DirSync 1.07 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
@@ -1033,8 +1053,13 @@ int main(int argc,char **argv)
 
 	if (verbose)
 	{
-		printf("%ld file(s) checked,%ld copied,%ld deleted in %ld second(s)",
-			   filesChecked,filesCopied,filesDeleted,end -start);
+		if (end - start > 0)
+			kbSec = kbCopied / (end -start);
+		else
+			kbSec = 0;
+				  
+		printf("%ld files, %ld copied (%lu KB, %ld KB/s), %ld deleted, %ld second(s)",
+			   filesChecked,filesCopied,kbCopied,kbSec,filesDeleted,end -start);
 		if (errors)
 			printf(",%ld error(s)",errors);
 		printf("\n");

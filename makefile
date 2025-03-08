@@ -1,4 +1,4 @@
-TARGET=dirsync-1_06
+TARGET=dirsync-1_07
 STDSRC=dirsync.c regcomp.c regexec.c regfree.c
 
 make:
