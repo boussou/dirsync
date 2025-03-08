@@ -1,5 +1,12 @@
 Changes
 ============================================================================
+1.03	10/18/2004
+		Added a getopt.h to the source distribution.
+		Corrected a bug when the source or destination end in \ 
+		thanks to Jim Cassidy.
+		Corrected a bug in display file copy percentage of file bigger
+		that 200 MB.
+
 1.02	10/08/2004
 		Added support for MSDOS version (see makefile).
 		Added man page and install for linux.

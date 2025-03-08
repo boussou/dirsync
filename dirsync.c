@@ -1,10 +1,16 @@
 /**
  * Directories syncronizer
  *
- * $Id: dirsync.c,v 1.9 2004/10/08 18:15:42 mviara Exp $
+ * $Id: dirsync.c,v 1.11 2004/10/18 08:49:48 mviara Exp $
  * $Name:  $
  *
  * $Log: dirsync.c,v $
+ * Revision 1.11  2004/10/18 08:49:48  mviara
+ * Version 1.03
+ *
+ * Revision 1.10  2004/10/16 09:04:53  mviara
+ * Corrected a bug in source or dest ending in \ or /
+ *
  * Revision 1.9  2004/10/08 18:15:42  mviara
  *
  * Added option from a text file.
@@ -37,7 +43,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.9 2004/10/08 18:15:42 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.11 2004/10/18 08:49:48 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +69,12 @@ static char rcsinfo[] = "$Id: dirsync.c,v 1.9 2004/10/08 18:15:42 mviara Exp $";
 #include <utime.h>
 #include <dirent.h>
 #include <unistd.h>
+#endif
+
+#ifdef __LINUX__
+#define DIRSEP	'/'
+#else
+#define DIRSEP	'\\'
 #endif
 
 /**
@@ -161,11 +173,7 @@ static void PrintError(char *cmd,char *obj)
 static char * FilePath(char * dest,char * dir,char * file)
 {
 
-#ifndef __LINUX__
-	sprintf(dest,"%s\\%s",dir,file);
-#else
-	sprintf(dest,"%s/%s",dir,file);
-#endif
+	sprintf(dest,"%s%c%s",dir,DIRSEP,file);
 	
 	
 	return dest;
@@ -275,7 +283,7 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 			if (count == e->statb.st_size)
 				perc = 100;
 			else
-				perc = (count * 100) / e->statb.st_size;
+				perc = (size_t)(((double)count * 100.0) / (double)e->statb.st_size);
 			
 			if (perc > 100)
 				perc = 100;
@@ -474,6 +482,7 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 						dirCount++;
 					}
 					break;
+					
 			case	S_IFREG:
 					if (EntrySearch(&excludedFiles,d->d_name) == NULL)
 					{
@@ -481,11 +490,13 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 						fileCount++;
 					}
 					break;
-
+#ifdef S_IFCHR
 			case	S_IFCHR:
 					fprintf(stderr,"\ndirsync: Ignored char device %s in %s\n",
 							d->d_name,dirname);
 					break;
+#endif
+					
 #ifdef	S_IFFIFO
 			case	S_IFFIFO:
 					fprintf(stderr,"\ndirsync: Ignored fifo %s in %s\n",
@@ -511,7 +522,7 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 	}
 
 	/**
-	 * Now create one array for files and directory
+	 * Now create one sorted array for files and directory
 	 */
 	ArrayCreate(&queue->files);
 	ArrayCreate(&queue->dirs);
@@ -806,13 +817,18 @@ static void AddEntryOption(Link_T * queue,char *name)
 }
 
 
+static void RemoveDirsep(char * path)
+{
+	if (path[strlen(path) - 1] == DIRSEP)
+		path[strlen(path) - 1] = '\0';
+}
 
 int main(int argc,char **argv)
 {
 	time_t start,end;
 	int o;
 
-	printf("DirSync 1.02 author mario@viara.cn\n\n");
+	printf("DirSync 1.03 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
@@ -875,6 +891,10 @@ int main(int argc,char **argv)
 	buffer = (char *)CheckedAlloc(bufferSize);
 
 	time(&start);
+
+	RemoveDirsep(argv[optind]);
+	RemoveDirsep(argv[optind+1]);
+	
 	dirsync(argv[optind],argv[optind+1]);
 	time(&end);
 
