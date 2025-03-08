@@ -1,10 +1,10 @@
-TARGET=dirsync-1_07
+TARGET=dirsync-1_08
 STDSRC=dirsync.c regcomp.c regexec.c regfree.c
 
 make:
 	@echo Please select your system and issue the command : make system
 	@echo Supported system are : watcomc,visualc,linux,msdos. The msdos
-	@echo versione require a OpenWatcom compiler.
+	@echo version require a OpenWatcom compiler.
 	@echo The linux version can be installed with : make install
 
 #

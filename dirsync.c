@@ -1,10 +1,21 @@
 /**
- * Directories syncronizer
- *
- * $Id: dirsync.c,v 1.20 2004/12/28 15:09:55 mviara Exp $
+ * $Id: dirsync.c,v 1.23 2005/11/05 20:54:16 mviara Exp $
  * $Name:  $
+ * 
+ * Directories syncronizer. Derived from dirimage.
  *
  * $Log: dirsync.c,v $
+ * Revision 1.23  2005/11/05 20:54:16  mviara
+ * Release 1.08
+ *
+ * Revision 1.22  2005/11/04 08:06:28  mviara
+ * Added support for verify copied data.
+ *
+ * Revision 1.21  2005/06/04 05:45:51  mviara
+ *
+ * Begin version 1.08, added supporto for ignore block devices.
+ * Fixed bug in linux manual.
+ *
  * Revision 1.20  2004/12/28 15:09:55  mviara
  * Added warning when file size change during a copy.
  *
@@ -73,7 +84,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.20 2004/12/28 15:09:55 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.23 2005/11/05 20:54:16 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -187,11 +198,12 @@ static long	errors = 0;
 static long	kbCopied = 0;
 static int	mode = 0;
 static int	dontRemove = 0;
+static int	fileVerify = 0;
 static Link_T	excludedDirs;
 static Link_T	excludedFiles;
 static Link_T	excludedRegex;
 
-static char	* buffer;
+static char	* buffer,* buffer1;
 static int	bufferSize = DEFAULT_BUFFER_SIZE;
 static int	verbose = DEFAULT_VERBOSE;
 
@@ -353,15 +365,91 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 		}
 	}
 
+	if (close(fdd))
+	{
+		PrintError("close",destPath);
+	}
+
+	while (fileVerify)
+	{
+		lseek(fds,0,SEEK_SET);
+		
+
+		fdd = open(destPath,O_RDONLY|O_BINARY,0777);
+		if (fdd < 0)
+		{
+			PrintError("open",destPath);
+			break;
+		}
+
+		count = 0;
+		oldPerc = 101;
+		
+		if (verbose > 1)
+		{
+			printf("\rVERIFY %-50.50s %10ld Byte ",e->name,e->statb.st_size);
+			fflush(stdout);
+		}
+
+		for (;;)
+		{
+			nread = read(fds,buffer,bufferSize);
+			if (nread < 0)
+			{
+				PrintError("read",sourcePath);
+				break;
+			}
+
+			if (nread == 0)
+				break;
+
+			if (read(fdd,buffer1,nread) != nread)
+			{
+				PrintError("read",destPath);
+				break;
+
+
+			}
+
+			if (memcmp(buffer,buffer1,nread))
+			{
+				PrintError("Verify",destPath);
+				break;
+			}
+			
+			count += nread;
+
+			if (verbose > 1)
+			{
+				if (count == e->statb.st_size)
+					perc = 100;
+				else
+					perc = (size_t)(((double)count * 100.0) / (double)e->statb.st_size);
+
+				if (perc > 100)
+					perc = 100;
+
+				if (perc != oldPerc)
+				{
+					printf("%%%03lu\010\010\010\010",perc);
+					fflush(stdout);
+					oldPerc = perc;
+				}
+			}
+		}
+
+		if (fdd >= 0)
+			close(fdd);
+
+		break;
+		
+	}
+	
 	if (close(fds))
 	{
 		PrintError("close",sourcePath);
 	}
 
-	if (close(fdd))
-	{
-		PrintError("close",destPath);
-	}
 
 	CopyAttribute(destPath,&e->statb);
 	
@@ -601,6 +689,14 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 						fileCount++;
 					}
 					break;
+
+#ifdef S_IFBLK
+			case	S_IFBLK:
+					fprintf(stderr,"\ndirsync: Ignored block device %s in %s\n",
+							d->d_name,dirname);
+					break;
+#endif
+					
 #ifdef S_IFCHR
 			case	S_IFCHR:
 					fprintf(stderr,"\ndirsync: Ignored char device %s in %s\n",
@@ -888,6 +984,7 @@ static void Usage()
 	printf("\t-h\tDisplay this message\n");
 	printf("\t-v lvl\tset verbose level (default %d,min 0,max 9)\n",DEFAULT_VERBOSE);
 	printf("\t-q\tQuiet mode (same result of -v 0)\n");
+	printf("\t-V\tVerify copied data\n");
 	printf("\t-X name\tExclude directory name (1) from scanning (default . ..)\n");
 	printf("\t-x name\tExclude file name (1) from scanning\n");
 	printf("\t-e name\tExclude regular expression name (1) from scanning\n");
@@ -977,7 +1074,7 @@ int main(int argc,char **argv)
 	long kbSec;
 	int o;
 
-	printf("DirSync 1.07 author mario@viara.cn\n\n");
+	printf("DirSync 1.08 author mario@viara.cn\n\n");
 	
 	QueueInit(&excludedDirs);
 	QueueInit(&excludedFiles);
@@ -989,10 +1086,13 @@ int main(int argc,char **argv)
 
 
 
-	while (( o = getopt(argc,argv,"qhv:x:X:b:m:re:")) != -1)
+	while (( o = getopt(argc,argv,"Vqhv:x:X:b:m:re:")) != -1)
 	{
 		switch (o)
 		{
+			case	'V':
+					fileVerify = 1;
+					break;
 			case	'r':
 					dontRemove = 1;
 					break;
@@ -1041,8 +1141,8 @@ int main(int argc,char **argv)
 		exit(1);
 	}
 	
-	buffer = (char *)CheckedAlloc(bufferSize);
-
+	buffer  = (char *)CheckedAlloc(bufferSize);
+	buffer1 = (char *)CheckedAlloc(bufferSize);
 	time(&start);
 
 	RemoveDirsep(argv[optind]);

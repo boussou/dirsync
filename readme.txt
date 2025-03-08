@@ -1,5 +1,11 @@
 Changes
 ============================================================================
+1.08	11/21/2005
+	Update manual.
+	Added support for option -V to verify copied data. After the copy all 
+	data are read from the destination and compared with the source. This
+	operation can be time consuming on large file.
+
 1.07	12/28/2004
 	Added warning when file size change during a copy.
 	Improved statistics of copied file(s).

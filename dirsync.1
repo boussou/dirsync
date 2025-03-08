@@ -1,4 +1,4 @@
-.TH UD 1 "07 October 2004" "Dirsync 1.02 Release"
+.TH UD 1 "22 Nov 2005" "Dirsync 1.08 Release"
 .UC 6
 .SH NAME
 dirsync \- Directory Synchronizer
@@ -13,7 +13,8 @@ dirsync \- Directory Synchronizer
 .I size
 .B ] [-m
 .I mode
-.B ] source dest
+.B ] [-V]
+.B source dest
 .SH DESCRIPTION
 DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical.
 .SH OPTIONS
@@ -28,7 +29,10 @@ Specify the verbosity level (default 0).
 Quiet mode (the same effect of -v 0).
 .TP
 .B \-e \ regex (1)
-Exclude files and directory matched by the regula expression for more inmformation about pattern matching see "Henry Spencer's regular expression library"
+Exclude files and directory matched by the regular expression for more inmformation about pattern matching see "Henry Spencer's regular expression library"
+.TP
+.B \-V \
+Read after write. Verify copied data.
 .TP
 .B \-X \ name (1)
 Exclude the directory named name.
@@ -37,12 +41,12 @@ Exclude the directory named name.
 Exclude the file named name.
 .TP
 .B \-b \ size
-Set the buffer size used for the copy, default 1048576.
+Set the buffer size used for the copy. Default 65536 for MSDOS or 1048576.
 .TP
 .B \-m \ mode
 Set file mode copy.
 .IP
-0 - Copy if have different size or date.
+0 - Copy if have different size or date. (Default)
 .IP
 1 - Copy if the destination is oldest than source.
 .TP
