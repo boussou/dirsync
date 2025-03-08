@@ -1,4 +1,4 @@
-TARGET=dirsync-1_09
+TARGET=dirsync-1_10
 STDSRC=dirsync.c regcomp.c regexec.c regfree.c
 
 make:
@@ -38,7 +38,7 @@ ${EXE}: ${SOURCE} makefile
 
 tar: dirsync.exe dirsync \
      dirsync.c getopt.h getopt.c dirent.h dirent.c \
-     regcomp.c  regexec.c  cclass.h cname.h \
+     regcomp.c  regexec.c  cclass.h cname.h utils.h \
      engine.c engine.ih  regcomp.ih  regerror.c regerror.ih \
      regex.h regex2.h regexec.c regfree.c \
      makefile readme.txt dirsync.1 dirsync.xml

@@ -1,6 +1,9 @@
 Changes
 ============================================================================
-1.09 01/20/2006
+1.10 28/01/2006
+	Fixed bug in the distribution package.
+
+1.09 20/01/2006
 	Added support for mode 2 (-m 2) in this mode dirsync do not copy or
 	remove any file/directories but only show the difference 
 	using this code :
@@ -8,6 +11,10 @@ Changes
 		1 name - Directory not present int the destination
 		2 name - File with different size
 		4 name - File not equal.
+		5 name - File not present in the source
+	If this option it is used with -l in the log will be registred the
+	word ERROR the file and the description.
+
 	This option work better with -v 0
 
 	Added option -D format (in strftime format) to change the date format

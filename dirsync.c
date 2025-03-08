@@ -1,5 +1,5 @@
 /**
- * $Id: dirsync.c,v 1.28 2006/01/26 17:47:41 mviara Exp $
+ * $Id: dirsync.c,v 1.29 2006/01/28 09:37:04 mviara Exp $
  * $Name:  $
  * 
  * Directories syncronizer. Derived from dirimage.
@@ -91,7 +91,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.28 2006/01/26 17:47:41 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.29 2006/01/28 09:37:04 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -372,6 +372,12 @@ static int FileVerify(char * msg,char *source,char * dest,Entry_T *e)
 		fflush(stdout);
 	}
 
+	if (log)
+	{
+		LogDateAndTime();
+		fprintf(log,"VERIFY %s %10lu Bytes\n",e->name,e->statb.st_size);
+	}
+	
 
 	result = 0;
 	
@@ -990,7 +996,12 @@ static int dirsync(char *source,char *dest)
 				if (mode == 2)
 				{
 					MSG_PATH(msg);
-					printf("\t %s  - File not present in source\n",de->name);
+					printf("\t5 %s\n",de->name);
+					if (log)
+					{
+						LogDateAndTime();
+						fprintf(log,"ERROR  %s - File not present in the source\n",de->name);
+					}
 				}
 				else
 				{
@@ -1019,6 +1030,11 @@ static int dirsync(char *source,char *dest)
 				{
 					MSG_PATH(msg);
 					printf("\t0%s\n",de->name);
+					if (log)
+					{
+						LogDateAndTime();
+						fprintf(log,"ERROR  %s - Directory not present in the source\n",de->name);
+					}
 					
 				}
 				else
@@ -1070,6 +1086,12 @@ static int dirsync(char *source,char *dest)
 			{
 				MSG_PATH(msg);
 				printf("\t2 %s\n",se->name);
+				if (log)
+				{
+					LogDateAndTime();
+					fprintf(log,"ERROR  %s - Need to be copied\n",se->name);
+				}
+				
 			}
 			else
 			{
@@ -1089,6 +1111,12 @@ static int dirsync(char *source,char *dest)
 				{
 					MSG_PATH(msg);
 					printf("\t4 %s\n",se->name);
+					if (log)
+					{
+						LogDateAndTime();
+						fprintf(log,"ERROR  %s - Verify error\n",se->name);
+					}
+					
 				}
 		}
 			
@@ -1109,6 +1137,12 @@ static int dirsync(char *source,char *dest)
 			{
 				MSG_PATH(msg);
 				printf("\t1 %s\n",se->name);
+				if (log)
+				{
+					LogDateAndTime();
+					fprintf(log,"ERROR  %s - Directory not present in destinatio\n",se->name);
+				}
+				
 			}
 			else
 				Mkdir(msg,destPath);
@@ -1234,7 +1268,7 @@ int main(int argc,char **argv)
 	long kbSec;
 	int o;
 	char logfile[PATH_MAX];
-	char * version = "DirSync 1.09 author mario@viara.cn";
+	char * version = "DirSync 1.10 author mario@viara.cn";
 
 	printf("%s\n\n",version);
 	
@@ -1343,7 +1377,7 @@ int main(int argc,char **argv)
 	if (log)
 	{
 		LogDateAndTime();
-		fprintf(log,"ARGS   %s %s\n",argv[optind],argv[optind+1]);
+		fprintf(log,"ARGS[%d]   %s %s\n",mode,argv[optind],argv[optind+1]);
 	}
 	
 	dirsync(argv[optind],argv[optind+1]);
