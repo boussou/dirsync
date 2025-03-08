@@ -1,78 +1,78 @@
-.TH UD 1 "25 Nov 2005" "Dirsync 1.09 Release"
+.TH UD 1 "26 Feb 2006" "Dirsync 1.11"
 .UC 6
 .SH NAME
 dirsync \- Directory Synchronizer
 .SH SYNOPSIS
-.B dirsync [-h] [-v
+dirsync [-h] [-v
 .I level
-.B ] [-q] [-X
+] [-q] [-X
 .I dir
-.B ] [-x
+] [-x
 .I file
-.B ] [-r] [-b
+] [-r] [-b
 .I size
-.B ] [-m
+] [-m
 .I mode
-.B ] [-V] [-T
+] [-V] [-T
 .I format
-.B ] [-D
+] [-D
 .I format
-.B ] [-l
+] [-l
 .I file
-.B ]
-.B source dest
+]
+.I source dest
 .SH DESCRIPTION
-DirSync is a Directory Synchronizer this utility take two argument the source directory and the destination and make recursively the two directories identical.
+DirSync is a Directory Synchronizer. This utility takes two arguments: the source
+and destination directory, and makes recursively the two directories identical.
 .SH OPTIONS
 .TP
-.B \-h \
-Display a short message help.
+ \-h \ Display a short message help.
 .TP
-.B \-v \ level
+ \-v \ level
 Specify the verbosity level (default 0).
 .TP
-.B \-q \
-Quiet mode (the same effect of -v 0).
+ \-q \ Quiet mode (the same effect of -v 0).
 .TP
-.B \-e \ regex (1)
-Exclude files and directory matched by the regular expression for more inmformation about pattern matching see "Henry Spencer's regular expression library"
+ \-e \ regex (1)
+Exclude files and directory matched by the regular expression. For more information about pattern matching see "Henry Spencer's regular expression library"
 .TP
-.B \-V \
-Read after write. Verify copied data.
+ \-V \ Read after write. Verify copied data.
 .TP
-.B \-X \ name (1)
+ \-X \ name (1)
 Exclude the directory named name.
 .TP
-.B \-x \ name (1)
+ \-x \ name (1)
 Exclude the file named name.
 .TP
-.B \-b \ size
+ \-b \ size
 Set the buffer size used for the copy. Default 65536 for MSDOS or 1048576.
 .TP
-.B \-m \ mode
-Set file mode copy.
+ \-m \ mode
+Set file copy mode:
 .IP
 0 - Copy if have different size or date. (Default)
 .IP
-1 - Copy if the destination is oldest than source.
+1 - Copy if the destination is older than source.
 .IP
 2 - Show only the difference.
 .TP
-.B \-r \
-Don't remove files/directories missed in the source.
+ \-r \ Don't remove files/directories missed in the source.
 .TP
-.B \-T \ format
+ \-T \ format
 Set the date and time format (in strftime style).
 .TP
-.B \-D \ format
+ \-D \ format
 Set the date format (in strftime style).
 .TP
-.B \-l \ file
+ \-l \ file
 Log the operation in the specified file. If file is - the filename will be 
 the current date formatted (see -D). Any line of the log have the date
 and time in the current time and date format (see -T).
 .TP
-(1) If name start with @ the remaining characters will be used as a file name. The file must contain space separated word used in sequence for the option.
+ \-L \ Follow symlinks (copy contents of the file instead of
+duplicating symlink).
+
+(1) If name starts with @ the remaining characters will be used as a file name. The file must contain space separated word used in sequence for the option.
 .SH "REPORTING BUGS"
 Report bugs to <mario@viara.cn>.
 .SH "SEE ALSO"

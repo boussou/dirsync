@@ -1,4 +1,4 @@
-TARGET=dirsync-1_10
+TARGET=dirsync-1_11
 STDSRC=dirsync.c regcomp.c regexec.c regfree.c
 
 make:
@@ -30,7 +30,7 @@ visualc:
 # LINUX Version may be work with many Unix system
 #
 linux:
-	make dirsync EXE=dirsync "SOURCE=${STDSRC}" CC="cc -D__LINUX__ -O -o dirsync"
+	make dirsync EXE=dirsync "SOURCE=${STDSRC}" CC="gcc -D__LINUX__ -O -o dirsync"
 
 
 ${EXE}: ${SOURCE} makefile

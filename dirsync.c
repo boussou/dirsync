@@ -1,9 +1,24 @@
 /**
- * $Id: dirsync.c,v 1.29 2006/01/28 09:37:04 mviara Exp $
+ * $Id: dirsync.c,v 1.30 2006/04/11 16:42:01 mviara Exp $
  * $Name:  $
  * 
  * Directories syncronizer. Derived from dirimage.
  *
+   Revision 1.27  2006/02/27 14:54:03  raj
+   Added mode 3 of copying - don't check mtimes on symlinks (useful when
+   doing a backward synchronization)
+ 
+   Revision 1.26  2006/02/26 22:00:27  raj (raj@ap.krakow.pl)
+   Release 1.11
+   Changed C++ style comments (// ...) to regular C-style comments to avoid
+   syntax errors in some compilers (eg. Sun's cc)
+   Fixed coredump in ArraySearch function when the table was empty
+   Made the program set access/modify times on directories too (under Unix)
+   Made the program set the ownership of files/dirs if run by root (Unix)
+   Made the program duplicate symlinks instead of copy their contents,
+   unless -L switch is specified (Unix)
+   Changed mode 2 to show also files with different mtimes, not only with
+   different sizes
  *
  * Revision 1.25  2005/11/26 14:59:12  mviara
  *
@@ -91,7 +106,7 @@
  * First imported version
  *
  */
-static char rcsinfo[] = "$Id: dirsync.c,v 1.29 2006/01/28 09:37:04 mviara Exp $";
+static char rcsinfo[] = "$Id: dirsync.c,v 1.30 2006/04/11 16:42:01 mviara Exp $";
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,10 +173,10 @@ typedef struct Entry_S
 {
 	Link_T	link;
 	
-	// Name without path
+/*	// Name without path      */
 	char *		name;
 	
-	// Stat buffer
+/*	// Stat buffer            */
 	struct stat	statb;
 	
 } Entry_T;
@@ -213,6 +228,8 @@ static FILE *	log = 0;
 static char	* buffer,* buffer1;
 static int	bufferSize = DEFAULT_BUFFER_SIZE;
 static int	verbose = DEFAULT_VERBOSE;
+/* (JR) add */
+static int	followSymlinks = 0;
 
 #define MSG_PATH(msg) if (*msg) \
 					  printf(msg);\
@@ -303,7 +320,10 @@ static void CopyAttribute(char *path,struct stat * statb)
 {
 	struct utimbuf time;
 
+/* (JR) mod - set attributes on directories too! */
+#ifndef __LINUX__
 	if ((statb->st_mode & S_IFMT) == S_IFREG)
+#endif
 	{
 		time.actime = statb->st_atime;
 		time.modtime = statb->st_mtime;
@@ -312,6 +332,14 @@ static void CopyAttribute(char *path,struct stat * statb)
 			PrintError("utime",path);
 		}
 	}
+
+#ifdef __LINUX__
+	/* (JR) if run as root, set ownership too */
+	if (geteuid() == 0) {
+	  if (chown(path,statb->st_uid,statb->st_gid))
+	    PrintError("chown",path);
+	}
+#endif
 
 	if (chmod(path,statb->st_mode))
 	{
@@ -325,8 +353,10 @@ static void FileUnlink(char * path)
 	
 	if (unlink(path))
 	{
+#ifdef UNSECURE
 		chmod(path,0777);
 		if (unlink(path))
+#endif
 			PrintError("unlink",path);
 	}
 
@@ -445,6 +475,10 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 	int fds,fdd;
 	char sourcePath[PATH_MAX+1];
 	char destPath[PATH_MAX+1];
+#ifdef __LINUX__
+	char symlinkPath[PATH_MAX+1];
+	int dd;
+#endif
 	int nread;
 	size_t count = 0;
 	size_t perc,oldPerc=101;
@@ -465,6 +499,34 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 	
 	FilePath(sourcePath,source,e->name);
 	FilePath(destPath,dest,e->name);
+	
+#ifdef __LINUX__
+        /* (JR) - duplicate symlinks instead of following them */
+	if ((e->statb.st_mode & S_IFMT) == S_IFLNK && !followSymlinks) {
+	  count=readlink(sourcePath,symlinkPath,PATH_MAX);
+	  if (count<0) {
+	    PrintError("symlink read",sourcePath);
+	    return;
+	  }
+	  /* add null byte */
+	  symlinkPath[count]=0;
+	  if (dd = symlink(symlinkPath,destPath) < 0) {
+	    if (errno==EEXIST) {
+	      FileUnlink(destPath);
+	      dd = symlink(symlinkPath,destPath);
+	    }
+	  }
+	  if (dd < 0) {
+	    PrintError("symlink create",destPath);
+	    return;
+	  }
+	  /* set ownership; can't set times nor permissions on a symlink */
+	  if (geteuid() == 0) {
+	    if (lchown(destPath,e->statb.st_uid,e->statb.st_gid))
+	    PrintError("chown",destPath);
+	  }
+	} else {
+#endif
 	
 	fds = open(sourcePath,O_RDONLY|O_BINARY);
 
@@ -547,6 +609,10 @@ static void FileCopy(char * msg,char *source,char * dest,Entry_T *e)
 
 	CopyAttribute(destPath,&e->statb);
 	
+#ifdef __LINUX__
+	}   /* (JR) end of symlink if ... */
+#endif
+
 	if (verbose > 1)
 		printf("\r");
 
@@ -616,11 +682,11 @@ static int RegexSearch(Link_T * head,char *name)
 	for (link = head->next ; link != head ; link=link->next)
 	{
 		e = (RegexEntry_T *)link;
-		//printf("regsearch %s with %s\n",e->name,name);
+/*		//printf("regsearch %s with %s\n",e->name,name);   */
 
 		if (regexec(&e->regex,name,0,NULL,0) == 0)
 		{
-			//printf("%s matched by %s \n",name,e->name);
+/*			//printf("%s matched by %s \n",name,e->name);   */
 
 			return 1;
 
@@ -691,10 +757,13 @@ static int ArrayCompare(const void *v1,const void *v2)
 static Entry_T *  ArraySearch(FileArray_T *a,Entry_T *e)
 {
 	Entry_T ** result;
-	result =  (Entry_T **)bsearch(&e,a->entry,a->count,sizeof(Entry_T *),ArrayCompare);
-	if (!result)
+	if (a->count > 0) {      /* dumps core if empty table! - (JR) */
+	  result =  (Entry_T **)bsearch(&e,a->entry,a->count,sizeof(Entry_T *),ArrayCompare);
+	  if (!result)
 		return 0;
-	return *result;
+	  return *result;
+	} else
+	  return 0;
 }
 
 
@@ -765,17 +834,22 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 	while ((d = readdir(dir)) != 0)
 	{
 		FilePath(path,dirname,d->d_name);
+/*test	printf("%s\n",d->d_name);  */
 
 		if (RegexSearch(&excludedRegex,path))
 			continue;
 		
+#ifdef __LINUX__
+		if (followSymlinks ? stat(path,&s) : lstat(path,&s))
+#else
 		if (stat(path,&s))
+#endif
 		{
 			PrintError("stat",path);
 			continue;
 		}
 
-		//printf("%s\n",d->d_name);
+/*		//printf("%s\n",d->d_name);   */
 		switch (s.st_mode & S_IFMT)
 		{
 			case	S_IFDIR:
@@ -787,6 +861,9 @@ static int ScanDir(char *dirname,Directory_T * queue,struct stat * statb)
 					break;
 					
 			case	S_IFREG:
+#ifdef S_IFLNK
+			case	S_IFLNK:
+#endif			
 					if (EntrySearch(&excludedFiles,d->d_name) == NULL)
 					{
 						EntryAdd(&queue->files.head,d->d_name,&s);
@@ -887,8 +964,10 @@ static void Rmdir(char * msg,char *dirname,char *file)
 
 	if (rmdir(path))
 	{
+#ifdef UNSECURE
 		chmod(path,0777);
 		if (rmdir(path))
+#endif
 		{
 			PrintError("rmdir",path);
 		}
@@ -930,7 +1009,7 @@ static void RmdirAll(char *msg,char *dirname,char *file)
 	if (ScanDir(path,&dir,&statb))
 		return;
 	
-	// Step 1. Remove all file
+/*	// Step 1. Remove all file       */
 	for (i = 0 ; i  < dir.files.count ; i++)
 	{
 		e = dir.files.entry[i];
@@ -938,7 +1017,7 @@ static void RmdirAll(char *msg,char *dirname,char *file)
 		FileRemove(msg,path,e->name);
 	}
 
-	// Step 2. Remove all dir
+/*	// Step 2. Remove all dir        */
 	for (i = 0 ; i < dir.dirs.count ; i++)
 	{
 		e = dir.dirs.entry[i];
@@ -946,7 +1025,7 @@ static void RmdirAll(char *msg,char *dirname,char *file)
 		RmdirAll(msg,path,e->name);
 	}
 
-	// Step 3. Remove dir
+/*	// Step 3. Remove dir            */
 
 	Rmdir(msg,dirname,file);
 
@@ -963,6 +1042,8 @@ static int dirsync(char *source,char *dest)
 	struct stat statSource,statDest;
 	int firstTime = 1;
 	long i;
+/* (JR) add */
+	int isLink = 0;
 	
 	sprintf(msg,"FROM   %-70.70s\nTO     %-70.70s\n",source,dest);
 
@@ -983,7 +1064,7 @@ static int dirsync(char *source,char *dest)
 		return 1;
 	}
 	
-	// Step 1. Delete all file not present in the source dir
+/*	// Step 1. Delete all file not present in the source dir    */
 	for (i = 0 ; i < dirDest.files.count ; i++)
 	{
 		de = dirDest.files.entry[i];
@@ -1008,7 +1089,9 @@ static int dirsync(char *source,char *dest)
 					if (firstTime)
 					{
 						firstTime = 0;
+#ifdef UNSECURE
 						chmod(dest,0777);
+#endif
 					}
 					FileRemove(msg,dest,de->name);
 				}
@@ -1016,7 +1099,7 @@ static int dirsync(char *source,char *dest)
 		}
 	}
 
-	// Step 2. Delete all directories not present in the source
+/*	// Step 2. Delete all directories not present in the source    */
 	for (i = 0 ; i < dirDest.dirs.count; i++)
 	{
 		de = dirDest.dirs.entry[i];
@@ -1029,7 +1112,8 @@ static int dirsync(char *source,char *dest)
 				if (mode == 2)
 				{
 					MSG_PATH(msg);
-					printf("\t0%s\n",de->name);
+/*					printf("\t0%s\n",de->name); */
+					printf("\t0 %s\n",de->name);
 					if (log)
 					{
 						LogDateAndTime();
@@ -1042,7 +1126,9 @@ static int dirsync(char *source,char *dest)
 					if (firstTime)
 					{
 						firstTime = 0;
+#ifdef UNSECURE
 						chmod(dest,0777);
+#endif
 					}					
 					RmdirAll(msg,dest,de->name);
 				}
@@ -1050,23 +1136,31 @@ static int dirsync(char *source,char *dest)
 		}
 	}
 	
-	// Step 3. Copy all file changed form source to dest
+/*	// Step 3. Copy all file changed form source to dest    */
 	for (i = 0 ; i < dirSource.files.count ; i++)
 	{
 		se = dirSource.files.entry[i];
 		de = ArraySearch(&dirDest.files,se);
+/* (JR) add */
+#ifdef S_IFLNK
+		isLink = ((se->statb.st_mode & S_IFMT) == S_IFLNK);
+#endif
+/* (JR) end */
 
 		needCopy = 0;
 		filesChecked++;
 		
-		// File not present in the destination
+/*		// File not present in the destination          */
 		if (de == NULL)
 			needCopy = 1;
 		else switch (mode)
 		{
 			case	0:
 					if (se->statb.st_size != de->statb.st_size ||
-					  se->statb.st_mtime != de->statb.st_mtime)
+/*					  se->statb.st_mtime != de->statb.st_mtime)  */
+/* (JR) mod */
+					  isLink ? (se->statb.st_mtime > de->statb.st_mtime)
+						 : (se->statb.st_mtime != de->statb.st_mtime))
 						needCopy = 1;
 					break;
 			case	1:
@@ -1074,7 +1168,17 @@ static int dirsync(char *source,char *dest)
 						needCopy = 1;
 					break;
 			case	2:
-					if (se->statb.st_size != de->statb.st_size)
+/*					if (se->statb.st_size != de->statb.st_size)  */
+/* (JR) mod */
+					if (se->statb.st_size != de->statb.st_size ||
+					  isLink ? (se->statb.st_mtime > de->statb.st_mtime)
+						 : (se->statb.st_mtime != de->statb.st_mtime))
+						needCopy = 1;
+					break;
+/* (JR) add */
+			case	3:
+					if (se->statb.st_size != de->statb.st_size ||
+					  (!isLink && se->statb.st_mtime != de->statb.st_mtime))
 						needCopy = 1;
 					break;
 					
@@ -1095,12 +1199,16 @@ static int dirsync(char *source,char *dest)
 			}
 			else
 			{
-				FileCopy(msg,source,dest,se);
+/*				FileCopy(msg,source,dest,se);  */
 				if (firstTime)
 				{
 					firstTime = 0;
+#ifdef UNSECURE
 					chmod(dest,0777);
-				}				
+#endif
+				}
+				/* this rather should be here? - (JR) */
+				FileCopy(msg,source,dest,se);
 				
 			}
 		}
@@ -1122,7 +1230,7 @@ static int dirsync(char *source,char *dest)
 			
 	}
 
-	// Step 4. Call dirsync in all directory
+/*	// Step 4. Call dirsync in all directory        */
 	for (i = 0 ; i < dirSource.dirs.count ; i++)
 	{
 
@@ -1145,7 +1253,18 @@ static int dirsync(char *source,char *dest)
 				
 			}
 			else
+				/* (JR) add */
+				if (firstTime)
+				{
+					firstTime = 0;
+#ifdef UNSECURE
+					chmod(dest,0777);
+#endif
+				}
+				/* (JR) end */
 				Mkdir(msg,destPath);
+				/* another (JR) add, in case of an empty dir */
+				CopyAttribute(destPath,&se->statb);
 		}
 
 		if (de != NULL || mode != 2)
@@ -1178,15 +1297,22 @@ static void Usage()
 	printf("\t-b size\tSet the read/write buffer size (default %d)\n",DEFAULT_BUFFER_SIZE);
 	printf("\t-m mode\tSet copy file mode,always missing file are copied\n");
 	printf("\t\t0 - Copy file if have different size or date (default)\n");
-	printf("\t\t1 - Copy file if the destination is oldest than source\n");
+	printf("\t\t1 - Copy file if the destination is older than source\n");
 	printf("\t\t2 - Do not copy any file only show the difference \n");
 	printf("\t\t    with this code :  0 Directory not present in source\n");
 	printf("\t\t                   :  1 Directory nont present in destination\n");
 	printf("\t\t                      2 Different size, 4 Not equal\n");
+	printf("\t\t3 - Like mode 0 but do not check size/time in symbolics link\n");
+/* (JR) add */
+	printf("\t\t3 - Like mode 0, but don't check date on symlinks\n");
+/* (JR) end */
 	printf("\t-T fmt\tSet date and time format, default %s\n",dateTimeFormat);
 	printf("\t-D fmt\tSet date format, default %s\n",dateFormat);
 	printf("\t-l file\tLog operation in file, if - use date format .log (see -D)\n");
 	printf("\t-r\tDon't remove file/directory missed in the source\n");
+/* (JR) add */
+	printf("\t-L\tFollow symlinks (copy contents instead of duplicating link)\n");
+/* (JR) end */
 	printf("\n\t\t(1) If name begin with @ for example @list the names will be\n");
 	printf("\t\tread from a text file named list.\n");
 	
@@ -1268,7 +1394,7 @@ int main(int argc,char **argv)
 	long kbSec;
 	int o;
 	char logfile[PATH_MAX];
-	char * version = "DirSync 1.10 author mario@viara.cn";
+	char * version = "DirSync 1.11 author mario@viara.cn, mod by (JR)";
 
 	printf("%s\n\n",version);
 	
@@ -1276,13 +1402,15 @@ int main(int argc,char **argv)
 	QueueInit(&excludedFiles);
 	QueueInit(&excludedRegex);
 	
-	// Add default excluded dir
+/*	// Add default excluded dir        */
 	EntryAdd(&excludedDirs,".",NULL);
 	EntryAdd(&excludedDirs,"..",NULL);
 
 
 
-	while (( o = getopt(argc,argv,"T:D:l:Vqhv:x:X:b:m:re:")) != -1)
+/*	while (( o = getopt(argc,argv,"T:D:l:Vqhv:x:X:b:m:re:")) != -1) */
+/* (JR) mod */
+	while (( o = getopt(argc,argv,"T:D:l:Vqhv:x:X:b:m:re:L")) != -1)
 	{
 		switch (o)
 		{
@@ -1321,7 +1449,7 @@ int main(int argc,char **argv)
 					
 			case	'm':
 					mode = atoi(optarg);
-					if (mode < 0 || mode > 2)
+					if (mode < 0 || mode > 3)
 					{
 						printf("dirsync: invalid -m %d\n",mode);
 						Usage();
@@ -1337,12 +1465,12 @@ int main(int argc,char **argv)
 					break;
 			case	'x':
 					AddEntryOption(&excludedFiles,optarg);
-					//EntryAdd(&excludedFiles,optarg,NULL);
+/*					//EntryAdd(&excludedFiles,optarg,NULL);  */
 					break;
 					
 			case	'X':
 					AddEntryOption(&excludedDirs,optarg);
-					//EntryAdd(&excludedDirs,optarg,NULL);
+/*					//EntryAdd(&excludedDirs,optarg,NULL);   */
 					break;
 			case	'q':
 					verbose = 0;
@@ -1354,6 +1482,10 @@ int main(int argc,char **argv)
 			case	'h':
 					Usage();
 					return 2;
+			/* (JR) add */
+			case	'L':
+					followSymlinks = 1;
+					break;
 		}
 	}
 

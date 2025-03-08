@@ -1,9 +1,20 @@
 Changes
 ============================================================================
-1.10 28/01/2006
+1.11	11/04/2006
+	Thanks to Jaroslaw Rafa for the following modification :
+
+	- Fixed bug in ArraySearch()
+	- Convert all comment from c++ to c style to compile on sun machine.
+	- Set modify/access time also for directories and not only files.
+	- Set uid/gid of copied files.
+	- Handle of symbolic links.
+	- Added mode 3 with like mode 0 but do not check date/time on
+	 symbolic links.
+
+1.10	28/01/2006
 	Fixed bug in the distribution package.
 
-1.09 20/01/2006
+1.09	20/01/2006
 	Added support for mode 2 (-m 2) in this mode dirsync do not copy or
 	remove any file/directories but only show the difference 
 	using this code :
