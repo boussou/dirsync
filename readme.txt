@@ -1,3 +1,15 @@
+About
+============================================================================
+
+DirSync is a Directory Synchronizer for Linux & Windows.
+Derived from an obsolete project named DirImage created in 1994.
+
+description
+============================================================================
+DirSync is a Directory Synchronizer. This utility take two arguments --  the source directory and the destination directory -- and recursively ensures that the two directories are identical. DirSync can be used to create incremental copies of large chunks of data. For example, if your file server's contents are in the directory /data, you can make a copy in a directory called /backup with the command "dirsync /data /backup."
+
+The first time you run dirsync, all data will be copied. When you issue the command again, though, only the changed files are copied. Both source code and an executable for Win32 and Linux are included in the distribution. Also it is possible compile dirsync for MS-DOS environment with OpenWatcom. It's very simple to compile DirSync for other Unix-like systems, too. Because the program works in all Win32 environments, you can run it with WinNt, Win2K and WinXP.
+
 Changes
 ============================================================================
 1.11	11/04/2006
@@ -86,3 +98,18 @@ Changes
 1.00	09/22/2004	
 	Fist public release.
 ============================================================================
+
+
+History
+============================================================================
+
+DirSync is derived from an obsolete project named DirImage created in 1994. DirImage is still downloadable here for the
+operating systems listed below; sorry, but all the programs are in Italian.
+
+Notes
+============================================================================
+
+original web address (no longer reachable):
+http://www.viara.eu/en/dirsync.htm
+
+For any comment or suggestion : mario __at__ viara __dot__ eu
